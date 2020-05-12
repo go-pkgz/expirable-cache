@@ -2,14 +2,14 @@
 //
 // Support LRC, LRU and TTL-based eviction.
 // Package is thread-safe and doesn't spawn any goroutines.
-// On every Set() call, cache deletes single oldest entry in cache in case it's expired.
-// In case MaxSize is set, cache deletes oldest entry disregarding it's expiration date to maintain the size.
-//
-// Important: only reliable way of not having expired entries stuck in cache is to
-// run DeleteExpired by time.Ticker, advisable time is 1/2 of TTL.
-//
+// On every Set() call, cache deletes single oldest entry in case it's expired.
+// In case MaxSize is set, cache deletes the oldest entry disregarding its expiration date to maintain the size,
+// either using LRC or LRU eviction.
 // In case of default TTL (10 years) and default MaxSize (0, unlimited) the cache will be truly unlimited
 // and will never delete entries from itself automatically.
+//
+// Important: only reliable way of not having expired entries stuck in a cache is to
+// run cache.DeleteExpired periodically using time.Ticker, advisable period is 1/2 of TTL.
 package cache
 
 import (
@@ -43,7 +43,7 @@ type Stats struct {
 	Added, Evicted int // number of added and evicted records
 }
 
-// loadingCacheImpl provides loading cache, implements cache.LoadingCache.
+// loadingCacheImpl provides loading cache, implements LoadingCache interface.
 type loadingCacheImpl struct {
 	ttl       time.Duration
 	maxKeys   int
@@ -59,7 +59,7 @@ type loadingCacheImpl struct {
 // noEvictionTTL - very long ttl to prevent eviction
 const noEvictionTTL = time.Hour * 24 * 365 * 10
 
-// NewLoadingCache returns a new cache.
+// NewLoadingCache returns a new LoadingCache.
 // Default MaxKeys is unlimited (0).
 // Default TTL is 10 years, sane value for expirable cache is 5 minutes.
 // Default eviction mode is LRC, appropriate option allow to change it to LRU.
