@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestLoadingCacheNoPurge(t *testing.T) {
-	lc, err := NewLoadingCache()
+func TestCacheNoPurge(t *testing.T) {
+	lc, err := NewCache()
 	assert.NoError(t, err)
 
 	lc.Set("key1", "val1", 0)
@@ -28,9 +28,9 @@ func TestLoadingCacheNoPurge(t *testing.T) {
 	assert.Equal(t, []string{"key1"}, lc.Keys())
 }
 
-func TestLoadingCacheWithDeleteExpired(t *testing.T) {
+func TestCacheWithDeleteExpired(t *testing.T) {
 	var evicted []string
-	lc, err := NewLoadingCache(
+	lc, err := NewCache(
 		TTL(150*time.Millisecond),
 		OnEvicted(func(key string, value interface{}) { evicted = append(evicted, key, value.(string)) }),
 	)
@@ -70,8 +70,8 @@ func TestLoadingCacheWithDeleteExpired(t *testing.T) {
 	assert.Equal(t, []string{"key1", "val1", "key2", "val2"}, evicted)
 }
 
-func TestLoadingCacheWithPurgeEnforcedBySize(t *testing.T) {
-	lc, err := NewLoadingCache(MaxKeys(10), TTL(time.Hour))
+func TestCacheWithPurgeEnforcedBySize(t *testing.T) {
+	lc, err := NewCache(MaxKeys(10), TTL(time.Hour))
 	assert.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
@@ -86,8 +86,8 @@ func TestLoadingCacheWithPurgeEnforcedBySize(t *testing.T) {
 	assert.Equal(t, 10, lc.Len())
 }
 
-func TestLoadingCacheConcurrency(t *testing.T) {
-	lc, err := NewLoadingCache()
+func TestCacheConcurrency(t *testing.T) {
+	lc, err := NewCache()
 	assert.NoError(t, err)
 	wg := sync.WaitGroup{}
 	wg.Add(1000)
@@ -101,9 +101,9 @@ func TestLoadingCacheConcurrency(t *testing.T) {
 	assert.Equal(t, 100, lc.Len())
 }
 
-func TestLoadingCacheInvalidateAndEvict(t *testing.T) {
+func TestCacheInvalidateAndEvict(t *testing.T) {
 	var evicted int
-	lc, err := NewLoadingCache(LRU(), OnEvicted(func(_ string, _ interface{}) { evicted++ }))
+	lc, err := NewCache(LRU(), OnEvicted(func(_ string, _ interface{}) { evicted++ }))
 	assert.NoError(t, err)
 
 	lc.Set("key1", "val1", 0)
@@ -133,16 +133,16 @@ func TestLoadingCacheInvalidateAndEvict(t *testing.T) {
 	assert.Equal(t, 0, lc.Len())
 }
 
-func TestLoadingCacheBadOption(t *testing.T) {
-	lc, err := NewLoadingCache(func(lc *loadingCacheImpl) error {
+func TestCacheBadOption(t *testing.T) {
+	lc, err := NewCache(func(lc *cacheImpl) error {
 		return errors.New("mock err")
 	})
 	assert.EqualError(t, err, "failed to set cache option: mock err")
 	assert.Nil(t, lc)
 }
 
-func TestLoadingExpired(t *testing.T) {
-	lc, err := NewLoadingCache(TTL(time.Millisecond * 5))
+func TestCacheExpired(t *testing.T) {
+	lc, err := NewCache(TTL(time.Millisecond * 5))
 	assert.NoError(t, err)
 
 	lc.Set("key1", "val1", 0)
@@ -168,8 +168,8 @@ func TestLoadingExpired(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func TestLoadingCacheRemoveOldest(t *testing.T) {
-	lc, err := NewLoadingCache(LRU(), MaxKeys(2))
+func TestCacheRemoveOldest(t *testing.T) {
+	lc, err := NewCache(LRU(), MaxKeys(2))
 	assert.NoError(t, err)
 
 	lc.Set("key1", "val1", 0)
@@ -192,9 +192,9 @@ func TestLoadingCacheRemoveOldest(t *testing.T) {
 	assert.Equal(t, 1, lc.Len())
 }
 
-func ExampleLoadingCache() {
+func ExampleCache() {
 	// make cache with short TTL and 3 max keys
-	cache, _ := NewLoadingCache(MaxKeys(3), TTL(time.Millisecond*10))
+	cache, _ := NewCache(MaxKeys(3), TTL(time.Millisecond*10))
 
 	// set value under key1.
 	// with 0 ttl (last parameter) will use cache-wide setting instead (10ms).

@@ -1,4 +1,4 @@
-// Package cache implements LoadingCache similar to hashicorp/golang-lru
+// Package cache implements Cache similar to hashicorp/golang-lru
 //
 // Support LRC, LRU and TTL-based eviction.
 // Package is thread-safe and doesn't spawn any goroutines.
@@ -21,8 +21,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// LoadingCache defines loading cache interface
-type LoadingCache interface {
+// Cache defines cache interface
+type Cache interface {
 	fmt.Stringer
 	Set(key string, value interface{}, ttl time.Duration)
 	Get(key string) (interface{}, bool)
@@ -43,8 +43,8 @@ type Stats struct {
 	Added, Evicted int // number of added and evicted records
 }
 
-// loadingCacheImpl provides loading cache, implements LoadingCache interface.
-type loadingCacheImpl struct {
+// cacheImpl provides Cache interface implementation.
+type cacheImpl struct {
 	ttl       time.Duration
 	maxKeys   int
 	isLRU     bool
@@ -59,12 +59,12 @@ type loadingCacheImpl struct {
 // noEvictionTTL - very long ttl to prevent eviction
 const noEvictionTTL = time.Hour * 24 * 365 * 10
 
-// NewLoadingCache returns a new LoadingCache.
+// NewCache returns a new Cache.
 // Default MaxKeys is unlimited (0).
 // Default TTL is 10 years, sane value for expirable cache is 5 minutes.
 // Default eviction mode is LRC, appropriate option allow to change it to LRU.
-func NewLoadingCache(options ...Option) (LoadingCache, error) {
-	res := loadingCacheImpl{
+func NewCache(options ...Option) (Cache, error) {
+	res := cacheImpl{
 		items:     map[string]*list.Element{},
 		evictList: list.New(),
 		ttl:       noEvictionTTL,
@@ -80,7 +80,7 @@ func NewLoadingCache(options ...Option) (LoadingCache, error) {
 }
 
 // Set key, ttl of 0 would use cache-wide TTL
-func (c *loadingCacheImpl) Set(key string, value interface{}, ttl time.Duration) {
+func (c *cacheImpl) Set(key string, value interface{}, ttl time.Duration) {
 	c.Lock()
 	defer c.Unlock()
 	now := time.Now()
@@ -114,7 +114,7 @@ func (c *loadingCacheImpl) Set(key string, value interface{}, ttl time.Duration)
 }
 
 // Get returns the key value if it's not expired
-func (c *loadingCacheImpl) Get(key string) (interface{}, bool) {
+func (c *cacheImpl) Get(key string) (interface{}, bool) {
 	c.Lock()
 	defer c.Unlock()
 	if ent, ok := c.items[key]; ok {
@@ -135,7 +135,7 @@ func (c *loadingCacheImpl) Get(key string) (interface{}, bool) {
 
 // Peek returns the key value (or undefined if not found) without updating the "recently used"-ness of the key.
 // Works exactly the same as Get in case of LRC mode (default one).
-func (c *loadingCacheImpl) Peek(key string) (interface{}, bool) {
+func (c *cacheImpl) Peek(key string) (interface{}, bool) {
 	c.Lock()
 	defer c.Unlock()
 	if ent, ok := c.items[key]; ok {
@@ -152,21 +152,21 @@ func (c *loadingCacheImpl) Peek(key string) (interface{}, bool) {
 }
 
 // Keys returns a slice of the keys in the cache, from oldest to newest.
-func (c *loadingCacheImpl) Keys() []string {
+func (c *cacheImpl) Keys() []string {
 	c.Lock()
 	defer c.Unlock()
 	return c.keys()
 }
 
 // Len return count of items in cache, including expired
-func (c *loadingCacheImpl) Len() int {
+func (c *cacheImpl) Len() int {
 	c.Lock()
 	defer c.Unlock()
 	return c.evictList.Len()
 }
 
 // Invalidate key (item) from the cache
-func (c *loadingCacheImpl) Invalidate(key string) {
+func (c *cacheImpl) Invalidate(key string) {
 	c.Lock()
 	defer c.Unlock()
 	if ent, ok := c.items[key]; ok {
@@ -175,7 +175,7 @@ func (c *loadingCacheImpl) Invalidate(key string) {
 }
 
 // InvalidateFn deletes multiple keys if predicate is true
-func (c *loadingCacheImpl) InvalidateFn(fn func(key string) bool) {
+func (c *cacheImpl) InvalidateFn(fn func(key string) bool) {
 	c.Lock()
 	defer c.Unlock()
 	for key, ent := range c.items {
@@ -186,14 +186,14 @@ func (c *loadingCacheImpl) InvalidateFn(fn func(key string) bool) {
 }
 
 // RemoveOldest remove oldest element in the cache
-func (c *loadingCacheImpl) RemoveOldest() {
+func (c *cacheImpl) RemoveOldest() {
 	c.Lock()
 	defer c.Unlock()
 	c.removeOldest()
 }
 
 // DeleteExpired clears cache of expired items
-func (c *loadingCacheImpl) DeleteExpired() {
+func (c *cacheImpl) DeleteExpired() {
 	c.Lock()
 	defer c.Unlock()
 	for _, key := range c.keys() {
@@ -204,7 +204,7 @@ func (c *loadingCacheImpl) DeleteExpired() {
 }
 
 // Purge clears the cache completely.
-func (c *loadingCacheImpl) Purge() {
+func (c *cacheImpl) Purge() {
 	c.Lock()
 	defer c.Unlock()
 	for k, v := range c.items {
@@ -218,20 +218,20 @@ func (c *loadingCacheImpl) Purge() {
 }
 
 // Stat gets the current stats for cache
-func (c *loadingCacheImpl) Stat() Stats {
+func (c *cacheImpl) Stat() Stats {
 	c.Lock()
 	defer c.Unlock()
 	return c.stat
 }
 
-func (c *loadingCacheImpl) String() string {
+func (c *cacheImpl) String() string {
 	stats := c.Stat()
 	size := c.Len()
 	return fmt.Sprintf("Size: %d, Stats: %+v (%0.1f%%)", size, stats, 100*float64(stats.Hits)/float64(stats.Hits+stats.Misses))
 }
 
 // Keys returns a slice of the keys in the cache, from oldest to newest. Has to be called with lock!
-func (c *loadingCacheImpl) keys() []string {
+func (c *cacheImpl) keys() []string {
 	keys := make([]string, 0, len(c.items))
 	for ent := c.evictList.Back(); ent != nil; ent = ent.Prev() {
 		keys = append(keys, ent.Value.(*cacheItem).key)
@@ -240,7 +240,7 @@ func (c *loadingCacheImpl) keys() []string {
 }
 
 // removeOldest removes the oldest item from the cache. Has to be called with lock!
-func (c *loadingCacheImpl) removeOldest() {
+func (c *cacheImpl) removeOldest() {
 	ent := c.evictList.Back()
 	if ent != nil {
 		c.removeElement(ent)
@@ -248,7 +248,7 @@ func (c *loadingCacheImpl) removeOldest() {
 }
 
 // removeOldest removes the oldest item from the cache in case it's already expired. Has to be called with lock!
-func (c *loadingCacheImpl) removeOldestIfExpired() {
+func (c *cacheImpl) removeOldestIfExpired() {
 	ent := c.evictList.Back()
 	if ent != nil && time.Now().After(ent.Value.(*cacheItem).expiresAt) {
 		c.removeElement(ent)
@@ -256,7 +256,7 @@ func (c *loadingCacheImpl) removeOldestIfExpired() {
 }
 
 // removeElement is used to remove a given list element from the cache. Has to be called with lock!
-func (c *loadingCacheImpl) removeElement(e *list.Element) {
+func (c *cacheImpl) removeElement(e *list.Element) {
 	c.evictList.Remove(e)
 	kv := e.Value.(*cacheItem)
 	delete(c.items, kv.key)

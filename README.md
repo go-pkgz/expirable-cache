@@ -4,7 +4,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/go-pkgz/expirable-cache/badge.svg?branch=master)](https://coveralls.io/github/go-pkgz/expirable-cache?branch=master)
 [![godoc](https://godoc.org/github.com/go-pkgz/expirable-cache?status.svg)](https://pkg.go.dev/github.com/go-pkgz/expirable-cache?tab=doc)
 
-Package cache implements expirable LoadingCache.
+Package cache implements expirable cache.
 
 - Support LRC, LRU and TTL-based eviction.
 - Package is thread-safe and doesn't spawn any goroutines.
@@ -34,14 +34,14 @@ import (
 
 func main() {
 	// make cache with short TTL and 3 max keys
-	lc, _ := cache.NewLoadingCache(cache.MaxKeys(3), cache.TTL(time.Millisecond*10))
+	c, _ := cache.NewCache(cache.MaxKeys(3), cache.TTL(time.Millisecond*10))
 
 	// set value under key1.
 	// with 0 ttl (last parameter) will use cache-wide setting instead (10ms).
-	lc.Set("key1", "val1", 0)
+	c.Set("key1", "val1", 0)
 
 	// get value under key1
-	r, ok := lc.Get("key1")
+	r, ok := c.Get("key1")
 
 	// check for OK value, because otherwise return would be nil and
 	// type conversion will panic
@@ -53,15 +53,15 @@ func main() {
 	time.Sleep(time.Millisecond * 11)
 
 	// get value under key1 after key expiration
-	r, ok = lc.Get("key1")
+	r, ok = c.Get("key1")
 	// don't convert to string as with ok == false value would be nil
 	fmt.Printf("value after expiration is found: %v, value: %v\n", ok, r)
 
 	// set value under key2, would evict old entry because it is already expired.
 	// ttl (last parameter) overrides cache-wide ttl.
-	lc.Set("key2", "val2", time.Minute*5)
+	c.Set("key2", "val2", time.Minute*5)
 
-	fmt.Printf("%+v\n", lc)
+	fmt.Printf("%+v\n", c)
 	// Output:
 	// value before expiration is found: true, value: val1
 	// value after expiration is found: false, value: <nil>
