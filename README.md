@@ -34,8 +34,9 @@ func main() {
 	// make cache with short TTL and 3 max keys
 	lc, _ := cache.NewLoadingCache(cache.MaxKeys(3), cache.TTL(time.Millisecond*10))
 
-	// set value under key1
-	lc.Set("key1", "val1")
+	// set value under key1.
+	// with 0 ttl (last parameter) will use cache-wide setting instead (10ms).
+	lc.Set("key1", "val1", 0)
 
 	// get value under key1
 	r, ok := lc.Get("key1")
@@ -51,11 +52,12 @@ func main() {
 
 	// get value under key1 after key expiration
 	r, ok = lc.Get("key1")
-	// don't convert to string as with ok == false value vould be nil
+	// don't convert to string as with ok == false value would be nil
 	fmt.Printf("value after expiration is found: %v, value: %v\n", ok, r)
 
-	// set value under key2, would evict old entry because it is already expired
-	lc.Set("key2", "val2")
+	// set value under key2, would evict old entry because it is already expired.
+	// ttl (last parameter) overrides cache-wide ttl.
+	lc.Set("key2", "val2", time.Minute*5)
 
 	fmt.Printf("%+v\n", lc)
 	// Output:

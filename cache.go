@@ -24,7 +24,7 @@ import (
 // LoadingCache defines loading cache interface
 type LoadingCache interface {
 	fmt.Stringer
-	Set(key string, value interface{})
+	Set(key string, value interface{}, ttl time.Duration)
 	Get(key string) (interface{}, bool)
 	Peek(key string) (interface{}, bool)
 	Keys() []string
@@ -79,35 +79,37 @@ func NewLoadingCache(options ...Option) (LoadingCache, error) {
 	return &res, nil
 }
 
-// Set key
-func (c *loadingCacheImpl) Set(key string, value interface{}) {
+// Set key, ttl of 0 would use cache-wide TTL
+func (c *loadingCacheImpl) Set(key string, value interface{}, ttl time.Duration) {
 	c.Lock()
 	defer c.Unlock()
 	now := time.Now()
+	if ttl == 0 {
+		ttl = c.ttl
+	}
 
 	// Check for existing item
 	if ent, ok := c.items[key]; ok {
 		c.evictList.MoveToFront(ent)
 		ent.Value.(*cacheItem).value = value
-		ent.Value.(*cacheItem).expiresAt = now.Add(c.ttl)
+		ent.Value.(*cacheItem).expiresAt = now.Add(ttl)
 		return
 	}
 
 	// Add new item
-	ent := &cacheItem{key: key, value: value, expiresAt: now.Add(c.ttl)}
+	ent := &cacheItem{key: key, value: value, expiresAt: now.Add(ttl)}
 	entry := c.evictList.PushFront(ent)
 	c.items[key] = entry
 	c.stat.Added++
 
 	// Remove oldest entry if it is expired, only in case of non-default TTL.
-	if c.ttl != noEvictionTTL {
+	if c.ttl != noEvictionTTL || ttl != noEvictionTTL {
 		c.removeOldestIfExpired()
 	}
 
 	// Verify size not exceeded
 	if c.maxKeys > 0 && len(c.items) > c.maxKeys {
 		c.removeOldest()
-		return
 	}
 }
 
@@ -132,16 +134,20 @@ func (c *loadingCacheImpl) Get(key string) (interface{}, bool) {
 }
 
 // Peek returns the key value (or undefined if not found) without updating the "recently used"-ness of the key.
+// Works exactly the same as Get in case of LRC mode (default one).
 func (c *loadingCacheImpl) Peek(key string) (interface{}, bool) {
 	c.Lock()
 	defer c.Unlock()
 	if ent, ok := c.items[key]; ok {
 		// Expired item check
 		if time.Now().After(ent.Value.(*cacheItem).expiresAt) {
+			c.stat.Misses++
 			return nil, false
 		}
+		c.stat.Hits++
 		return ent.Value.(*cacheItem).value, true
 	}
+	c.stat.Misses++
 	return nil, false
 }
 
@@ -193,12 +199,6 @@ func (c *loadingCacheImpl) DeleteExpired() {
 	for _, key := range c.keys() {
 		if time.Now().After(c.items[key].Value.(*cacheItem).expiresAt) {
 			c.removeElement(c.items[key])
-			continue
-		}
-		// if cache is not LRU, keys() are sorted by expiresAt and there are no
-		// more expired entries left at this point
-		if !c.isLRU {
-			return
 		}
 	}
 }

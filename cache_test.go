@@ -14,7 +14,7 @@ func TestLoadingCacheNoPurge(t *testing.T) {
 	lc, err := NewLoadingCache()
 	assert.NoError(t, err)
 
-	lc.Set("key1", "val1")
+	lc.Set("key1", "val1", 0)
 	assert.Equal(t, 1, lc.Len())
 
 	v, ok := lc.Peek("key1")
@@ -36,7 +36,7 @@ func TestLoadingCacheWithDeleteExpired(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	lc.Set("key1", "val1")
+	lc.Set("key1", "val1", 0)
 
 	time.Sleep(100 * time.Millisecond) // not enough to expire
 	lc.DeleteExpired()
@@ -56,7 +56,7 @@ func TestLoadingCacheWithDeleteExpired(t *testing.T) {
 	assert.Equal(t, []string{"key1", "val1"}, evicted)
 
 	// add new entry
-	lc.Set("key2", "val2")
+	lc.Set("key2", "val2", 0)
 	assert.Equal(t, 1, lc.Len())
 
 	// nothing deleted
@@ -76,7 +76,7 @@ func TestLoadingCacheWithPurgeEnforcedBySize(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		i := i
-		lc.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i))
+		lc.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i), 0)
 		v, ok := lc.Get(fmt.Sprintf("key%d", i))
 		assert.Equal(t, fmt.Sprintf("val%d", i), v)
 		assert.True(t, ok)
@@ -93,7 +93,7 @@ func TestLoadingCacheConcurrency(t *testing.T) {
 	wg.Add(1000)
 	for i := 0; i < 1000; i++ {
 		go func(i int) {
-			lc.Set(fmt.Sprintf("key-%d", i/10), fmt.Sprintf("val-%d", i/10))
+			lc.Set(fmt.Sprintf("key-%d", i/10), fmt.Sprintf("val-%d", i/10), 0)
 			wg.Done()
 		}(i)
 	}
@@ -106,8 +106,8 @@ func TestLoadingCacheInvalidateAndEvict(t *testing.T) {
 	lc, err := NewLoadingCache(LRU(), OnEvicted(func(_ string, _ interface{}) { evicted++ }))
 	assert.NoError(t, err)
 
-	lc.Set("key1", "val1")
-	lc.Set("key2", "val2")
+	lc.Set("key1", "val1", 0)
+	lc.Set("key2", "val2", 0)
 
 	val, ok := lc.Get("key1")
 	assert.True(t, ok)
@@ -145,7 +145,7 @@ func TestLoadingExpired(t *testing.T) {
 	lc, err := NewLoadingCache(TTL(time.Millisecond * 5))
 	assert.NoError(t, err)
 
-	lc.Set("key1", "val1")
+	lc.Set("key1", "val1", 0)
 	assert.Equal(t, 1, lc.Len())
 
 	v, ok := lc.Peek("key1")
@@ -172,7 +172,7 @@ func TestLoadingCacheRemoveOldest(t *testing.T) {
 	lc, err := NewLoadingCache(LRU(), MaxKeys(2))
 	assert.NoError(t, err)
 
-	lc.Set("key1", "val1")
+	lc.Set("key1", "val1", 0)
 	assert.Equal(t, 1, lc.Len())
 
 	v, ok := lc.Get("key1")
@@ -182,7 +182,7 @@ func TestLoadingCacheRemoveOldest(t *testing.T) {
 	assert.Equal(t, []string{"key1"}, lc.Keys())
 	assert.Equal(t, 1, lc.Len())
 
-	lc.Set("key2", "val2")
+	lc.Set("key2", "val2", 0)
 	assert.Equal(t, []string{"key1", "key2"}, lc.Keys())
 	assert.Equal(t, 2, lc.Len())
 
@@ -196,8 +196,9 @@ func ExampleLoadingCache() {
 	// make cache with short TTL and 3 max keys
 	cache, _ := NewLoadingCache(MaxKeys(3), TTL(time.Millisecond*10))
 
-	// set value under key1
-	cache.Set("key1", "val1")
+	// set value under key1.
+	// with 0 ttl (last parameter) will use cache-wide setting instead (10ms).
+	cache.Set("key1", "val1", 0)
 
 	// get value under key1
 	r, ok := cache.Get("key1")
@@ -213,11 +214,12 @@ func ExampleLoadingCache() {
 
 	// get value under key1 after key expiration
 	r, ok = cache.Get("key1")
-	// don't convert to string as with ok == false value vould be nil
+	// don't convert to string as with ok == false value would be nil
 	fmt.Printf("value after expiration is found: %v, value: %v\n", ok, r)
 
-	// set value under key2, would evict old entry because it is already expired
-	cache.Set("key2", "val2")
+	// set value under key2, would evict old entry because it is already expired.
+	// ttl (last parameter) overrides cache-wide ttl.
+	cache.Set("key2", "val2", time.Minute*5)
 
 	fmt.Printf("%+v\n", cache)
 	// Output:
