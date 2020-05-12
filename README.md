@@ -4,7 +4,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/go-pkgz/expirable-cache/badge.svg?branch=master)](https://coveralls.io/github/go-pkgz/expirable-cache?branch=master)
 [![godoc](https://godoc.org/github.com/go-pkgz/expirable-cache?status.svg)](https://pkg.go.dev/github.com/go-pkgz/expirable-cache?tab=doc)
 
-Package cache implements LoadingCache similar to [hashicorp/golang-lru](https://github.com/hashicorp/golang-lru).
+Package cache implements expirable LoadingCache.
 
 - Support LRC, LRU and TTL-based eviction.
 - Package is thread-safe and doesn't spawn any goroutines.
@@ -17,6 +17,8 @@ either using LRC or LRU eviction.
 **Important**: only reliable way of not having expired entries stuck in a cache is to
 run cache.DeleteExpired periodically using [time.Ticker](https://golang.org/pkg/time/#Ticker),
 advisable period is 1/2 of TTL.
+
+This cache is heavily inspired by [hashicorp/golang-lru](https://github.com/hashicorp/golang-lru) _simplelru_ implementation.
 
 ### Usage example
 
