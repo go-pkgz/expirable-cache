@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -135,7 +134,7 @@ func TestCacheInvalidateAndEvict(t *testing.T) {
 
 func TestCacheBadOption(t *testing.T) {
 	lc, err := NewCache(func(lc *cacheImpl) error {
-		return errors.New("mock err")
+		return fmt.Errorf("mock err")
 	})
 	assert.EqualError(t, err, "failed to set cache option: mock err")
 	assert.Nil(t, lc)
