@@ -196,7 +196,7 @@ func ExampleCache() {
 	// check for OK value, because otherwise return would be nil and
 	// type conversion will panic
 	if ok {
-		fmt.Printf("value before expiration is found: %v, value: %v\n", ok, r)
+		fmt.Printf("value before expiration is found: %v, value: %q\n", ok, r)
 	}
 
 	time.Sleep(time.Millisecond * 11)
@@ -204,7 +204,7 @@ func ExampleCache() {
 	// get value under key1 after key expiration
 	r, ok = cache.Get("key1")
 	// don't convert to string as with ok == false value would be nil
-	fmt.Printf("value after expiration is found: %v, value: %v\n", ok, r)
+	fmt.Printf("value after expiration is found: %v, value: %q\n", ok, r)
 
 	// set value under key2, would evict old entry because it is already expired.
 	// ttl (last parameter) overrides cache-wide ttl.
@@ -212,7 +212,7 @@ func ExampleCache() {
 
 	fmt.Printf("%+v\n", cache)
 	// Output:
-	// value before expiration is found: true, value: val1
-	// value after expiration is found: false, value:
+	// value before expiration is found: true, value: "val1"
+	// value after expiration is found: false, value: ""
 	// Size: 1, Stats: {Hits:1 Misses:1 Added:2 Evicted:1} (50.0%)
 }
