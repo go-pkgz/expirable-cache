@@ -4,7 +4,13 @@ on:
   push:
     branches:
     tags:
+    paths:
+      - ".github/workflows/ci-v2.yml"
+      - "v2/**"
   pull_request:
+    paths:
+      - ".github/workflows/ci-v2.yml"
+      - "v2/**"
 
 jobs:
   build:

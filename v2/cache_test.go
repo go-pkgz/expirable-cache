@@ -10,8 +10,7 @@ import (
 )
 
 func TestCacheNoPurge(t *testing.T) {
-	lc, err := NewCache[string, string]()
-	assert.NoError(t, err)
+	lc := NewCache[string, string]()
 
 	lc.Set("key1", "val1", 0)
 	assert.Equal(t, 1, lc.Len())
@@ -29,9 +28,10 @@ func TestCacheNoPurge(t *testing.T) {
 
 func TestCacheWithDeleteExpired(t *testing.T) {
 	var evicted []string
-	lc, err := NewCache[string, string](Options[string, string]().TTL(150 * time.Millisecond).
-		OnEvicted(func(key string, value string) { evicted = append(evicted, key, value) }))
-	assert.NoError(t, err)
+	lc := NewCache[string, string]().WithTTL(150 * time.Millisecond).WithOnEvicted(
+		func(key string, value string) {
+			evicted = append(evicted, key, value)
+		})
 
 	lc.Set("key1", "val1", 0)
 
@@ -68,8 +68,7 @@ func TestCacheWithDeleteExpired(t *testing.T) {
 }
 
 func TestCacheWithPurgeEnforcedBySize(t *testing.T) {
-	lc, err := NewCache[string, string](Options[string, string]().TTL(time.Hour).MaxKeys(10))
-	assert.NoError(t, err)
+	lc := NewCache[string, string]().WithTTL(time.Hour).WithMaxKeys(10)
 
 	for i := 0; i < 100; i++ {
 		i := i
@@ -84,8 +83,7 @@ func TestCacheWithPurgeEnforcedBySize(t *testing.T) {
 }
 
 func TestCacheConcurrency(t *testing.T) {
-	lc, err := NewCache[string, string]()
-	assert.NoError(t, err)
+	lc := NewCache[string, string]()
 	wg := sync.WaitGroup{}
 	wg.Add(1000)
 	for i := 0; i < 1000; i++ {
@@ -100,9 +98,7 @@ func TestCacheConcurrency(t *testing.T) {
 
 func TestCacheInvalidateAndEvict(t *testing.T) {
 	var evicted int
-	opts := Options[string, string]().LRU().OnEvicted(func(_ string, _ string) { evicted++ })
-	lc, err := NewCache(opts)
-	assert.NoError(t, err)
+	lc := NewCache[string, string]().WithLRU().WithOnEvicted(func(_ string, _ string) { evicted++ })
 
 	lc.Set("key1", "val1", 0)
 	lc.Set("key2", "val2", 0)
@@ -132,8 +128,7 @@ func TestCacheInvalidateAndEvict(t *testing.T) {
 }
 
 func TestCacheExpired(t *testing.T) {
-	lc, err := NewCache[string, string](Options[string, string]().TTL(time.Millisecond * 5))
-	assert.NoError(t, err)
+	lc := NewCache[string, string]().WithTTL(time.Millisecond * 5)
 
 	lc.Set("key1", "val1", 0)
 	assert.Equal(t, 1, lc.Len())
@@ -159,8 +154,7 @@ func TestCacheExpired(t *testing.T) {
 }
 
 func TestCacheRemoveOldest(t *testing.T) {
-	lc, err := NewCache[string, string](Options[string, string]().LRU().MaxKeys(2))
-	assert.NoError(t, err)
+	lc := NewCache[string, string]().WithLRU().WithMaxKeys(2)
 
 	lc.Set("key1", "val1", 0)
 	assert.Equal(t, 1, lc.Len())
@@ -184,7 +178,7 @@ func TestCacheRemoveOldest(t *testing.T) {
 
 func ExampleCache() {
 	// make cache with short TTL and 3 max keys
-	cache, _ := NewCache[string, string](Options[string, string]().MaxKeys(3).TTL(time.Millisecond * 10))
+	cache := NewCache[string, string]().WithMaxKeys(3).WithTTL(time.Millisecond * 10)
 
 	// set value under key1.
 	// with 0 ttl (last parameter) will use cache-wide setting instead (10ms).
