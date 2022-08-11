@@ -22,6 +22,7 @@ import (
 // Cache defines cache interface
 type Cache[K comparable, V any] interface {
 	fmt.Stringer
+	options[K, V]
 	Set(key K, value V, ttl time.Duration)
 	Get(key K) (V, bool)
 	Peek(key K) (V, bool)
@@ -61,30 +62,13 @@ const noEvictionTTL = time.Hour * 24 * 365 * 10
 // Default MaxKeys is unlimited (0).
 // Default TTL is 10 years, sane value for expirable cache is 5 minutes.
 // Default eviction mode is LRC, appropriate option allow to change it to LRU.
-func NewCache[K comparable, V any](options ...*options[K, V]) (Cache[K, V], error) {
-	res := &cacheImpl[K, V]{
+func NewCache[K comparable, V any]() Cache[K, V] {
+	return &cacheImpl[K, V]{
 		items:     map[K]*list.Element{},
 		evictList: list.New(),
 		ttl:       noEvictionTTL,
 		maxKeys:   0,
 	}
-
-	if len(options) > 0 {
-		if options[0].ttl != nil {
-			res.ttl = *options[0].ttl
-		}
-		if options[0].maxKeys != nil {
-			res.maxKeys = *options[0].maxKeys
-		}
-		if options[0].lru != nil {
-			res.isLRU = *options[0].lru
-		}
-		if options[0].onEvicted != nil {
-			res.onEvicted = options[0].onEvicted
-		}
-	}
-
-	return res, nil
 }
 
 // Set key, ttl of 0 would use cache-wide TTL
