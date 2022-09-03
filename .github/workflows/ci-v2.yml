@@ -1,14 +1,14 @@
-name: build
+name: build-v2
 
 on:
   push:
     branches:
     tags:
-    paths-ignore:
+    paths:
       - ".github/workflows/ci-v2.yml"
       - "v2/**"
   pull_request:
-    paths-ignore:
+    paths:
       - ".github/workflows/ci-v2.yml"
       - "v2/**"
 
@@ -30,6 +30,7 @@ jobs:
         run: |
           go test -timeout=60s -race -covermode=atomic -coverprofile=$GITHUB_WORKSPACE/profile.cov
           go build -race
+        working-directory: v2
 
       - name: install golangci-lint and goveralls
         run: |
@@ -38,8 +39,10 @@ jobs:
 
       - name: run linters
         run: $GITHUB_WORKSPACE/golangci-lint run --out-format=github-actions
+        working-directory: v2
 
       - name: submit coverage
         run: $(go env GOPATH)/bin/goveralls -service="github" -coverprofile=$GITHUB_WORKSPACE/profile.cov
         env:
           COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: v2
