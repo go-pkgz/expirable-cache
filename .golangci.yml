@@ -3,15 +3,8 @@ linters-settings:
     check-shadowing: true
   gocyclo:
     min-complexity: 15
-  maligned:
-    suggest-new: true
-  goconst:
-    min-len: 2
-    min-occurrences: 2
   misspell:
     locale: US
-  lll:
-    line-length: 140
   gocritic:
     enabled-tags:
       - performance
@@ -22,22 +15,17 @@ linters-settings:
 
 linters:
   enable:
-    - megacheck
     - revive
     - govet
     - unconvert
     - megacheck
-    - structcheck
     - gas
     - gocyclo
     - dupl
     - misspell
     - unparam
-    - varcheck
-    - deadcode
     - typecheck
     - ineffassign
-    - varcheck
     - stylecheck
     - gochecknoinits
     - exportloopref
@@ -45,6 +33,7 @@ linters:
     - nakedret
     - gosimple
     - prealloc
+    - unused
   fast: false
   disable-all: true
 
