@@ -167,6 +167,28 @@ func TestCacheExpired(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestCache_GetExpiration(t *testing.T) {
+	lc, err := NewCache(TTL(time.Second * 5))
+	assert.NoError(t, err)
+
+	lc.Set("key1", "val1", 0)
+	assert.Equal(t, 1, lc.Len())
+
+	exp := lc.GetExpiration("key1")
+	assert.True(t, exp.After(time.Now().Add(time.Second*4)))
+	assert.True(t, exp.Before(time.Now().Add(time.Second*6)))
+
+	lc.Set("key2", "val2", time.Second*10)
+	assert.Equal(t, 2, lc.Len())
+
+	exp = lc.GetExpiration("key2")
+	assert.True(t, exp.After(time.Now().Add(time.Second*9)))
+	assert.True(t, exp.Before(time.Now().Add(time.Second*11)))
+
+	exp = lc.GetExpiration("non-existing-key")
+	assert.Zero(t, exp)
+}
+
 func TestCacheRemoveOldest(t *testing.T) {
 	lc, err := NewCache(LRU(), MaxKeys(2))
 	assert.NoError(t, err)

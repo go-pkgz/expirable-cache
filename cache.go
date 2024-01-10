@@ -24,6 +24,7 @@ type Cache interface {
 	fmt.Stringer
 	Set(key string, value interface{}, ttl time.Duration)
 	Get(key string) (interface{}, bool)
+	GetExpiration(key string) time.Time
 	Peek(key string) (interface{}, bool)
 	Keys() []string
 	Len() int
@@ -147,6 +148,16 @@ func (c *cacheImpl) Peek(key string) (interface{}, bool) {
 	}
 	c.stat.Misses++
 	return nil, false
+}
+
+// GetExpiration returns the expiration time of the key. Non-existing key returns zero time.
+func (c *cacheImpl) GetExpiration(key string) time.Time {
+	c.Lock()
+	defer c.Unlock()
+	if ent, ok := c.items[key]; ok {
+		return ent.Value.(*cacheItem).expiresAt
+	}
+	return time.Time{}
 }
 
 // Keys returns a slice of the keys in the cache, from oldest to newest.

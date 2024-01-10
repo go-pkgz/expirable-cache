@@ -25,6 +25,7 @@ type Cache[K comparable, V any] interface {
 	options[K, V]
 	Set(key K, value V, ttl time.Duration)
 	Get(key K) (V, bool)
+	GetExpiration(key K) time.Time
 	Peek(key K) (V, bool)
 	Keys() []K
 	Len() int
@@ -143,6 +144,16 @@ func (c *cacheImpl[K, V]) Peek(key K) (V, bool) {
 	}
 	c.stat.Misses++
 	return def, false
+}
+
+// GetExpiration returns the expiration time of the key. Non-existing key returns zero time.
+func (c *cacheImpl[K, V]) GetExpiration(key K) time.Time {
+	c.Lock()
+	defer c.Unlock()
+	if ent, ok := c.items[key]; ok {
+		return ent.Value.(*cacheItem[K, V]).expiresAt
+	}
+	return time.Time{}
 }
 
 // Keys returns a slice of the keys in the cache, from oldest to newest.
