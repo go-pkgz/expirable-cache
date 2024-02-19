@@ -18,7 +18,7 @@ either using LRC or LRU eviction.
 run cache.DeleteExpired periodically using [time.Ticker](https://golang.org/pkg/time/#Ticker),
 advisable period is 1/2 of TTL.
 
-This cache is heavily inspired by [hashicorp/golang-lru](https://github.com/hashicorp/golang-lru) _simplelru_ implementation. Key differences are:
+This cache is heavily inspired by [hashicorp/golang-lru](https://github.com/hashicorp/golang-lru) _simplelru_ implementation. v3 implements `simplelru.LRUCache` interface, so if you use a subset of functions, so you can switch from `github.com/hashicorp/golang-lru/v2/simplelru` or `github.com/hashicorp/golang-lru/v2/expirable` without any changes in your code except for cache creation. Key differences are:
 
 - Support LRC (Least Recently Created) in addition to LRU and TTL-based eviction
 - Supports per-key TTL setting
@@ -34,7 +34,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-pkgz/expirable-cache/v2"
+	"github.com/go-pkgz/expirable-cache/v3"
 )
 
 func main() {

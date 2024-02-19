@@ -23,16 +23,23 @@ import (
 type Cache[K comparable, V any] interface {
 	fmt.Stringer
 	options[K, V]
+	Add(key K, value V) bool
 	Set(key K, value V, ttl time.Duration)
 	Get(key K) (V, bool)
+	GetExpiration(key K) (time.Time, bool)
+	GetOldest() (K, V, bool)
+	Contains(key K) (ok bool)
 	Peek(key K) (V, bool)
+	Values() []V
 	Keys() []K
 	Len() int
+	Remove(key K) bool
 	Invalidate(key K)
 	InvalidateFn(fn func(key K) bool)
-	RemoveOldest()
+	RemoveOldest() (K, V, bool)
 	DeleteExpired()
 	Purge()
+	Resize(int) int
 	Stat() Stats
 }
 
@@ -71,8 +78,22 @@ func NewCache[K comparable, V any]() Cache[K, V] {
 	}
 }
 
+// Add adds a value to the cache. Returns true if an eviction occurred.
+// Returns false if there was no eviction: the item was already in the cache,
+// or the size was not exceeded.
+func (c *cacheImpl[K, V]) Add(key K, value V) (evicted bool) {
+	return c.addWithTTL(key, value, c.ttl)
+}
+
 // Set key, ttl of 0 would use cache-wide TTL
 func (c *cacheImpl[K, V]) Set(key K, value V, ttl time.Duration) {
+	c.addWithTTL(key, value, ttl)
+}
+
+// Returns true if an eviction occurred.
+// Returns false if there was no eviction: the item was already in the cache,
+// or the size was not exceeded.
+func (c *cacheImpl[K, V]) addWithTTL(key K, value V, ttl time.Duration) (evicted bool) {
 	c.Lock()
 	defer c.Unlock()
 	now := time.Now()
@@ -85,7 +106,7 @@ func (c *cacheImpl[K, V]) Set(key K, value V, ttl time.Duration) {
 		c.evictList.MoveToFront(ent)
 		ent.Value.(*cacheItem[K, V]).value = value
 		ent.Value.(*cacheItem[K, V]).expiresAt = now.Add(ttl)
-		return
+		return false
 	}
 
 	// Add new item
@@ -94,15 +115,17 @@ func (c *cacheImpl[K, V]) Set(key K, value V, ttl time.Duration) {
 	c.items[key] = entry
 	c.stat.Added++
 
-	// Remove oldest entry if it is expired, only in case of non-default TTL.
+	// Remove the oldest entry if it is expired, only in case of non-default TTL.
 	if c.ttl != noEvictionTTL || ttl != noEvictionTTL {
 		c.removeOldestIfExpired()
 	}
 
+	evict := c.maxKeys > 0 && len(c.items) > c.maxKeys
 	// Verify size not exceeded
-	if c.maxKeys > 0 && len(c.items) > c.maxKeys {
+	if evict {
 		c.removeOldest()
 	}
+	return evict
 }
 
 // Get returns the key value if it's not expired
@@ -114,7 +137,7 @@ func (c *cacheImpl[K, V]) Get(key K) (V, bool) {
 		// Expired item check
 		if time.Now().After(ent.Value.(*cacheItem[K, V]).expiresAt) {
 			c.stat.Misses++
-			return def, false
+			return ent.Value.(*cacheItem[K, V]).value, false
 		}
 		if c.isLRU {
 			c.evictList.MoveToFront(ent)
@@ -124,6 +147,15 @@ func (c *cacheImpl[K, V]) Get(key K) (V, bool) {
 	}
 	c.stat.Misses++
 	return def, false
+}
+
+// Contains checks if a key is in the cache, without updating the recent-ness
+// or deleting it for being stale.
+func (c *cacheImpl[K, V]) Contains(key K) (ok bool) {
+	c.Lock()
+	defer c.Unlock()
+	_, ok = c.items[key]
+	return ok
 }
 
 // Peek returns the key value (or undefined if not found) without updating the "recently used"-ness of the key.
@@ -136,13 +168,23 @@ func (c *cacheImpl[K, V]) Peek(key K) (V, bool) {
 		// Expired item check
 		if time.Now().After(ent.Value.(*cacheItem[K, V]).expiresAt) {
 			c.stat.Misses++
-			return def, false
+			return ent.Value.(*cacheItem[K, V]).value, false
 		}
 		c.stat.Hits++
 		return ent.Value.(*cacheItem[K, V]).value, true
 	}
 	c.stat.Misses++
 	return def, false
+}
+
+// GetExpiration returns the expiration time of the key. Non-existing key returns zero time.
+func (c *cacheImpl[K, V]) GetExpiration(key K) (time.Time, bool) {
+	c.Lock()
+	defer c.Unlock()
+	if ent, ok := c.items[key]; ok {
+		return ent.Value.(*cacheItem[K, V]).expiresAt, true
+	}
+	return time.Time{}, false
 }
 
 // Keys returns a slice of the keys in the cache, from oldest to newest.
@@ -152,11 +194,46 @@ func (c *cacheImpl[K, V]) Keys() []K {
 	return c.keys()
 }
 
+// Values returns a slice of the values in the cache, from oldest to newest.
+// Expired entries are filtered out.
+func (c *cacheImpl[K, V]) Values() []V {
+	c.Lock()
+	defer c.Unlock()
+	values := make([]V, 0, len(c.items))
+	now := time.Now()
+	for ent := c.evictList.Back(); ent != nil; ent = ent.Prev() {
+		if now.After(ent.Value.(*cacheItem[K, V]).expiresAt) {
+			continue
+		}
+		values = append(values, ent.Value.(*cacheItem[K, V]).value)
+	}
+	return values
+}
+
 // Len return count of items in cache, including expired
 func (c *cacheImpl[K, V]) Len() int {
 	c.Lock()
 	defer c.Unlock()
 	return c.evictList.Len()
+}
+
+// Resize changes the cache size. Size of 0 means unlimited.
+func (c *cacheImpl[K, V]) Resize(size int) int {
+	c.Lock()
+	defer c.Unlock()
+	if size <= 0 {
+		c.maxKeys = 0
+		return 0
+	}
+	diff := c.evictList.Len() - size
+	if diff < 0 {
+		diff = 0
+	}
+	for i := 0; i < diff; i++ {
+		c.removeOldest()
+	}
+	c.maxKeys = size
+	return diff
 }
 
 // Invalidate key (item) from the cache
@@ -179,11 +256,37 @@ func (c *cacheImpl[K, V]) InvalidateFn(fn func(key K) bool) {
 	}
 }
 
-// RemoveOldest remove oldest element in the cache
-func (c *cacheImpl[K, V]) RemoveOldest() {
+// Remove removes the provided key from the cache, returning if the
+// key was contained.
+func (c *cacheImpl[K, V]) Remove(key K) bool {
 	c.Lock()
 	defer c.Unlock()
-	c.removeOldest()
+	if ent, ok := c.items[key]; ok {
+		c.removeElement(ent)
+		return true
+	}
+	return false
+}
+
+// RemoveOldest remove the oldest element in the cache
+func (c *cacheImpl[K, V]) RemoveOldest() (key K, value V, ok bool) {
+	c.Lock()
+	defer c.Unlock()
+	if ent := c.evictList.Back(); ent != nil {
+		c.removeElement(ent)
+		return ent.Value.(*cacheItem[K, V]).key, ent.Value.(*cacheItem[K, V]).value, true
+	}
+	return
+}
+
+// GetOldest returns the oldest entry
+func (c *cacheImpl[K, V]) GetOldest() (key K, value V, ok bool) {
+	c.Lock()
+	defer c.Unlock()
+	if ent := c.evictList.Back(); ent != nil {
+		return ent.Value.(*cacheItem[K, V]).key, ent.Value.(*cacheItem[K, V]).value, true
+	}
+	return
 }
 
 // DeleteExpired clears cache of expired items
