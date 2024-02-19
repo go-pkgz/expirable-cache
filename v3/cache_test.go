@@ -1,29 +1,178 @@
 package cache
 
 import (
+	"crypto/rand"
 	"fmt"
+	"math"
+	"math/big"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/hashicorp/golang-lru/v2/simplelru"
 	"github.com/stretchr/testify/assert"
 )
+
+func getRand(tb testing.TB) int64 {
+	out, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return out.Int64()
+}
+
+func BenchmarkLRU_Rand_NoExpire(b *testing.B) {
+	l := NewCache[int64, int64]().WithLRU().WithMaxKeys(8192)
+
+	trace := make([]int64, b.N*2)
+	for i := 0; i < b.N*2; i++ {
+		trace[i] = getRand(b) % 32768
+	}
+
+	b.ResetTimer()
+
+	var hit, miss int
+	for i := 0; i < 2*b.N; i++ {
+		if i%2 == 0 {
+			l.Add(trace[i], trace[i])
+		} else {
+			if _, ok := l.Get(trace[i]); ok {
+				hit++
+			} else {
+				miss++
+			}
+		}
+	}
+	b.Logf("hit: %d miss: %d ratio: %f", hit, miss, float64(hit)/float64(hit+miss))
+}
+
+func BenchmarkLRU_Freq_NoExpire(b *testing.B) {
+	l := NewCache[int64, int64]().WithLRU().WithMaxKeys(8192)
+
+	trace := make([]int64, b.N*2)
+	for i := 0; i < b.N*2; i++ {
+		if i%2 == 0 {
+			trace[i] = getRand(b) % 16384
+		} else {
+			trace[i] = getRand(b) % 32768
+		}
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		l.Add(trace[i], trace[i])
+	}
+	var hit, miss int
+	for i := 0; i < b.N; i++ {
+		if _, ok := l.Get(trace[i]); ok {
+			hit++
+		} else {
+			miss++
+		}
+	}
+	b.Logf("hit: %d miss: %d ratio: %f", hit, miss, float64(hit)/float64(hit+miss))
+}
+
+func BenchmarkLRU_Rand_WithExpire(b *testing.B) {
+	l := NewCache[int64, int64]().WithLRU().WithMaxKeys(8192).WithTTL(time.Millisecond * 10)
+
+	trace := make([]int64, b.N*2)
+	for i := 0; i < b.N*2; i++ {
+		trace[i] = getRand(b) % 32768
+	}
+
+	b.ResetTimer()
+
+	var hit, miss int
+	for i := 0; i < 2*b.N; i++ {
+		if i%2 == 0 {
+			l.Add(trace[i], trace[i])
+		} else {
+			if _, ok := l.Get(trace[i]); ok {
+				hit++
+			} else {
+				miss++
+			}
+		}
+	}
+	b.Logf("hit: %d miss: %d ratio: %f", hit, miss, float64(hit)/float64(hit+miss))
+}
+
+func BenchmarkLRU_Freq_WithExpire(b *testing.B) {
+	l := NewCache[int64, int64]().WithLRU().WithMaxKeys(8192).WithTTL(time.Millisecond * 10)
+
+	trace := make([]int64, b.N*2)
+	for i := 0; i < b.N*2; i++ {
+		if i%2 == 0 {
+			trace[i] = getRand(b) % 16384
+		} else {
+			trace[i] = getRand(b) % 32768
+		}
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		l.Add(trace[i], trace[i])
+	}
+	var hit, miss int
+	for i := 0; i < b.N; i++ {
+		if _, ok := l.Get(trace[i]); ok {
+			hit++
+		} else {
+			miss++
+		}
+	}
+	b.Logf("hit: %d miss: %d ratio: %f", hit, miss, float64(hit)/float64(hit+miss))
+}
+
+func TestSimpleLRUInterface(_ *testing.T) {
+	var _ simplelru.LRUCache[int, int] = NewCache[int, int]()
+}
 
 func TestCacheNoPurge(t *testing.T) {
 	lc := NewCache[string, string]()
 
-	lc.Set("key1", "val1", 0)
-	assert.Equal(t, 1, lc.Len())
+	k, v, ok := lc.GetOldest()
+	assert.Empty(t, k)
+	assert.Empty(t, v)
+	assert.False(t, ok)
 
-	v, ok := lc.Peek("key1")
+	lc.Add("key1", "val1")
+	assert.Equal(t, 1, lc.Len())
+	assert.True(t, lc.Contains("key1"))
+	assert.False(t, lc.Contains("key2"))
+
+	v, ok = lc.Peek("key1")
 	assert.Equal(t, "val1", v)
+	assert.True(t, ok)
+
+	k, v, ok = lc.GetOldest()
+	assert.Equal(t, "key1", k)
+	assert.Equal(t, "val1", v)
+	assert.True(t, ok)
+
+	lc.Add("key3", "val3")
+	lc.Add("key4", "val4")
+	lc.Peek("key3")
+	k, v, ok = lc.GetOldest()
+	assert.Equal(t, "key1", k)
+	assert.Equal(t, "val1", v)
+	assert.True(t, ok)
+
+	lc.Add("key1", "val1")
+	k, v, ok = lc.GetOldest()
+	assert.Equal(t, "key3", k)
+	assert.Equal(t, "val3", v)
 	assert.True(t, ok)
 
 	v, ok = lc.Peek("key2")
 	assert.Empty(t, v)
 	assert.False(t, ok)
 
-	assert.Equal(t, []string{"key1"}, lc.Keys())
+	assert.Equal(t, []string{"key3", "key4", "key1"}, lc.Keys())
 }
 
 func TestCacheWithDeleteExpired(t *testing.T) {
@@ -67,6 +216,24 @@ func TestCacheWithDeleteExpired(t *testing.T) {
 	assert.Equal(t, []string{"key1", "val1", "key2", "val2"}, evicted)
 }
 
+func TestCache_Values(t *testing.T) {
+	lc := NewCache[string, string]().WithMaxKeys(3)
+
+	lc.Add("key1", "val1")
+	lc.Add("key2", "val2")
+	lc.Add("key3", "val3")
+
+	values := lc.Values()
+	if !reflect.DeepEqual(values, []string{"val1", "val2", "val3"}) {
+		t.Fatalf("values differs from expected")
+	}
+
+	assert.Equal(t, 0, lc.Resize(0))
+	assert.Equal(t, 1, lc.Resize(2))
+	assert.Equal(t, 0, lc.Resize(5))
+	assert.Equal(t, 1, lc.Resize(1))
+}
+
 func TestCacheWithPurgeEnforcedBySize(t *testing.T) {
 	lc := NewCache[string, string]().WithTTL(time.Hour).WithMaxKeys(10)
 
@@ -102,6 +269,7 @@ func TestCacheInvalidateAndEvict(t *testing.T) {
 
 	lc.Set("key1", "val1", 0)
 	lc.Set("key2", "val2", 0)
+	lc.Set("key3", "val3", 0)
 
 	val, ok := lc.Get("key1")
 	assert.True(t, ok)
@@ -124,7 +292,15 @@ func TestCacheInvalidateAndEvict(t *testing.T) {
 	assert.Equal(t, 2, evicted)
 	_, ok = lc.Get("key2")
 	assert.False(t, ok)
-	assert.Equal(t, 0, lc.Len())
+	assert.Equal(t, 1, lc.Len())
+
+	assert.True(t, lc.Remove("key3"))
+	assert.Equal(t, 3, evicted)
+	val, ok = lc.Get("key3")
+	assert.Empty(t, val)
+	assert.False(t, ok)
+	assert.False(t, lc.Remove("key3"))
+	assert.Zero(t, lc.Len())
 }
 
 func TestCacheExpired(t *testing.T) {
@@ -145,12 +321,38 @@ func TestCacheExpired(t *testing.T) {
 	assert.Equal(t, 1, lc.Len())      // but not purged
 
 	v, ok = lc.Peek("key1")
-	assert.Empty(t, v)
+	assert.Equal(t, "val1", v, "expired and marked as such, but value is available")
 	assert.False(t, ok)
 
 	v, ok = lc.Get("key1")
-	assert.Empty(t, v)
+	assert.Equal(t, "val1", v, "expired and marked as such, but value is available")
 	assert.False(t, ok)
+
+	assert.Empty(t, lc.Values())
+}
+
+func TestCache_GetExpiration(t *testing.T) {
+	lc := NewCache[string, string]().WithTTL(time.Second * 5)
+
+	lc.Set("key1", "val1", time.Second*5)
+	assert.Equal(t, 1, lc.Len())
+
+	exp, ok := lc.GetExpiration("key1")
+	assert.True(t, ok)
+	assert.True(t, exp.After(time.Now().Add(time.Second*4)))
+	assert.True(t, exp.Before(time.Now().Add(time.Second*6)))
+
+	lc.Set("key2", "val2", time.Second*10)
+	assert.Equal(t, 2, lc.Len())
+
+	exp, ok = lc.GetExpiration("key2")
+	assert.True(t, ok)
+	assert.True(t, exp.After(time.Now().Add(time.Second*9)))
+	assert.True(t, exp.Before(time.Now().Add(time.Second*11)))
+
+	exp, ok = lc.GetExpiration("non-existing-key")
+	assert.False(t, ok)
+	assert.Zero(t, exp)
 }
 
 func TestCacheRemoveOldest(t *testing.T) {
@@ -170,10 +372,26 @@ func TestCacheRemoveOldest(t *testing.T) {
 	assert.Equal(t, []string{"key1", "key2"}, lc.Keys())
 	assert.Equal(t, 2, lc.Len())
 
-	lc.RemoveOldest()
+	k, v, ok := lc.RemoveOldest()
+	assert.Equal(t, "key1", k)
+	assert.Equal(t, "val1", v)
+	assert.True(t, ok)
 
 	assert.Equal(t, []string{"key2"}, lc.Keys())
 	assert.Equal(t, 1, lc.Len())
+
+	k, v, ok = lc.RemoveOldest()
+	assert.Equal(t, "key2", k)
+	assert.Equal(t, "val2", v)
+	assert.True(t, ok)
+
+	k, v, ok = lc.RemoveOldest()
+	assert.Empty(t, k)
+	assert.Empty(t, v)
+	assert.False(t, ok)
+
+	assert.Empty(t, lc.Keys())
+
 }
 
 func ExampleCache() {
@@ -207,6 +425,6 @@ func ExampleCache() {
 	fmt.Printf("%+v\n", cache)
 	// Output:
 	// value before expiration is found: true, value: "val1"
-	// value after expiration is found: false, value: ""
+	// value after expiration is found: false, value: "val1"
 	// Size: 1, Stats: {Hits:1 Misses:1 Added:2 Evicted:1} (50.0%)
 }
