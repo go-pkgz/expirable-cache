@@ -133,7 +133,7 @@ func TestCacheInvalidateAndEvict(t *testing.T) {
 }
 
 func TestCacheBadOption(t *testing.T) {
-	lc, err := NewCache(func(lc *cacheImpl) error {
+	lc, err := NewCache(func(_ *cacheImpl) error {
 		return fmt.Errorf("mock err")
 	})
 	assert.EqualError(t, err, "failed to set cache option: mock err")
