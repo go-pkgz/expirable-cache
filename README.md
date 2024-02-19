@@ -18,7 +18,12 @@ either using LRC or LRU eviction.
 run cache.DeleteExpired periodically using [time.Ticker](https://golang.org/pkg/time/#Ticker),
 advisable period is 1/2 of TTL.
 
-This cache is heavily inspired by [hashicorp/golang-lru](https://github.com/hashicorp/golang-lru) _simplelru_ implementation.
+This cache is heavily inspired by [hashicorp/golang-lru](https://github.com/hashicorp/golang-lru) _simplelru_ implementation. Key differences are:
+
+- Support LRC (Least Recently Created) in addition to LRU and TTL-based eviction
+- Supports per-key TTL setting
+- Doesn't spawn any goroutines, whereas `hashicorp/golang-lru/v2/expirable` spawns goroutine which is never killed ([as of now](https://github.com/hashicorp/golang-lru/issues/159))
+- Provides stats about hits and misses, added and evicted entries
 
 ### Usage example
 
