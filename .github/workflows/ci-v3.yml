@@ -1,19 +1,15 @@
-name: build
+name: build-v3
 
 on:
   push:
     branches:
     tags:
-    paths-ignore:
-      - ".github/workflows/ci-v2.yml"
+    paths:
       - ".github/workflows/ci-v3.yml"
-      - "v2/**"
       - "v3/**"
   pull_request:
-    paths-ignore:
-      - ".github/workflows/ci-v2.yml"
+    paths:
       - ".github/workflows/ci-v3.yml"
-      - "v2/**"
       - "v3/**"
 
 jobs:
@@ -34,11 +30,14 @@ jobs:
         run: |
           go test -timeout=60s -race -covermode=atomic -coverprofile=$GITHUB_WORKSPACE/profile.cov
           go build -race
+        working-directory: v3
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
           version: latest
+          args: --config ../.golangci.yml
+          working-directory: v3
 
       - name: install goveralls, submit coverage
         run: |
@@ -46,3 +45,4 @@ jobs:
           goveralls -service="github" -coverprofile=$GITHUB_WORKSPACE/profile.cov
         env:
           COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: v3
