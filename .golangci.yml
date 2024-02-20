@@ -15,6 +15,7 @@ linters-settings:
 
 linters:
   enable:
+    - megacheck
     - revive
     - govet
     - unconvert
@@ -23,7 +24,6 @@ linters:
     - gocyclo
     - dupl
     - misspell
-    - unparam
     - typecheck
     - ineffassign
     - stylecheck
@@ -42,6 +42,3 @@ run:
     format: tab
   skip-dirs:
     - vendor
-
-issues:
-  exclude-use-default: false
