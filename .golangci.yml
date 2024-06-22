@@ -1,6 +1,7 @@
 linters-settings:
   govet:
-    check-shadowing: true
+    enable:
+      - shadow
   gocyclo:
     min-complexity: 15
   misspell:
@@ -15,30 +16,23 @@ linters-settings:
 
 linters:
   enable:
-    - megacheck
-    - revive
-    - govet
-    - unconvert
-    - megacheck
-    - gas
-    - gocyclo
     - dupl
-    - misspell
-    - typecheck
-    - ineffassign
-    - stylecheck
-    - gochecknoinits
     - exportloopref
+    - gochecknoinits
     - gocritic
-    - nakedret
+    - gocyclo
+    - gosec
     - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - nakedret
     - prealloc
+    - revive
+    - staticcheck
+    - stylecheck
+    - typecheck
+    - unconvert
     - unused
   fast: false
   disable-all: true
-
-run:
-  output:
-    format: tab
-  skip-dirs:
-    - vendor

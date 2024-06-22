@@ -1,13 +1,131 @@
 package cache
 
 import (
+	"crypto/rand"
 	"fmt"
+	"math"
+	"math/big"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func getRand(tb testing.TB) int64 {
+	out, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return out.Int64()
+}
+
+func BenchmarkLRU_Rand_NoExpire(b *testing.B) {
+	l, _ := NewCache(MaxKeys(8192), LRU())
+
+	trace := make([]int64, b.N*2)
+	for i := 0; i < b.N*2; i++ {
+		trace[i] = getRand(b) % 32768
+	}
+
+	b.ResetTimer()
+
+	var hit, miss int
+	for i := 0; i < 2*b.N; i++ {
+		if i%2 == 0 {
+			l.Set(strconv.Itoa(int(trace[i])), trace[i], 0)
+		} else {
+			if _, ok := l.Get(strconv.Itoa(int(trace[i]))); ok {
+				hit++
+			} else {
+				miss++
+			}
+		}
+	}
+	b.Logf("hit: %d miss: %d ratio: %f", hit, miss, float64(hit)/float64(hit+miss))
+}
+
+func BenchmarkLRU_Freq_NoExpire(b *testing.B) {
+	l, _ := NewCache(MaxKeys(8192), LRU())
+
+	trace := make([]int64, b.N*2)
+	for i := 0; i < b.N*2; i++ {
+		if i%2 == 0 {
+			trace[i] = getRand(b) % 16384
+		} else {
+			trace[i] = getRand(b) % 32768
+		}
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		l.Set(strconv.Itoa(int(trace[i])), trace[i], 0)
+	}
+	var hit, miss int
+	for i := 0; i < b.N; i++ {
+		if _, ok := l.Get(strconv.Itoa(int(trace[i]))); ok {
+			hit++
+		} else {
+			miss++
+		}
+	}
+	b.Logf("hit: %d miss: %d ratio: %f", hit, miss, float64(hit)/float64(hit+miss))
+}
+
+func BenchmarkLRU_Rand_WithExpire(b *testing.B) {
+	l, _ := NewCache(MaxKeys(8192), LRU(), TTL(time.Millisecond*10))
+
+	trace := make([]int64, b.N*2)
+	for i := 0; i < b.N*2; i++ {
+		trace[i] = getRand(b) % 32768
+	}
+
+	b.ResetTimer()
+
+	var hit, miss int
+	for i := 0; i < 2*b.N; i++ {
+		if i%2 == 0 {
+			l.Set(strconv.Itoa(int(trace[i])), trace[i], 0)
+		} else {
+			if _, ok := l.Get(strconv.Itoa(int(trace[i]))); ok {
+				hit++
+			} else {
+				miss++
+			}
+		}
+	}
+	b.Logf("hit: %d miss: %d ratio: %f", hit, miss, float64(hit)/float64(hit+miss))
+}
+
+func BenchmarkLRU_Freq_WithExpire(b *testing.B) {
+	l, _ := NewCache(MaxKeys(8192), LRU(), TTL(time.Millisecond*10))
+
+	trace := make([]int64, b.N*2)
+	for i := 0; i < b.N*2; i++ {
+		if i%2 == 0 {
+			trace[i] = getRand(b) % 16384
+		} else {
+			trace[i] = getRand(b) % 32768
+		}
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		l.Set(strconv.Itoa(int(trace[i])), trace[i], 0)
+	}
+	var hit, miss int
+	for i := 0; i < b.N; i++ {
+		if _, ok := l.Get(strconv.Itoa(int(trace[i]))); ok {
+			hit++
+		} else {
+			miss++
+		}
+	}
+	b.Logf("hit: %d miss: %d ratio: %f", hit, miss, float64(hit)/float64(hit+miss))
+}
 
 func TestCacheNoPurge(t *testing.T) {
 	lc, err := NewCache()

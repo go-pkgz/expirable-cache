@@ -15,9 +15,9 @@ func OnEvicted(fn func(key string, value interface{})) Option {
 
 // MaxKeys functional option defines how many keys to keep.
 // By default it is 0, which means unlimited.
-func MaxKeys(max int) Option {
+func MaxKeys(maximum int) Option {
 	return func(lc *cacheImpl) error {
-		lc.maxKeys = max
+		lc.maxKeys = maximum
 		return nil
 	}
 }

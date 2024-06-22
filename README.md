@@ -73,3 +73,89 @@ func main() {
 	// Size: 1, Stats: {Hits:1 Misses:1 Added:2 Evicted:1} (50.0%)
 }
 ```
+
+### v3 performance improvements
+
+v3 (and v2) are done using generics and 38-42% faster than v1 without them according to benchmarks.
+
+<details> 
+<summary>v1</summary>
+
+```
+~/expirable-cache ❯ go test -bench=.
+goos: darwin
+goarch: arm64
+pkg: github.com/go-pkgz/expirable-cache
+BenchmarkLRU_Rand_NoExpire-8     	 4494738	       272.4 ns/op
+--- BENCH: BenchmarkLRU_Rand_NoExpire-8
+    cache_test.go:46: hit: 0 miss: 1 ratio: 0.000000
+    cache_test.go:46: hit: 1 miss: 99 ratio: 0.010000
+    cache_test.go:46: hit: 1352 miss: 8648 ratio: 0.135200
+    cache_test.go:46: hit: 248678 miss: 751322 ratio: 0.248678
+    cache_test.go:46: hit: 1121791 miss: 3372947 ratio: 0.249579
+BenchmarkLRU_Freq_NoExpire-8     	 4612648	       261.6 ns/op
+--- BENCH: BenchmarkLRU_Freq_NoExpire-8
+    cache_test.go:74: hit: 1 miss: 0 ratio: 1.000000
+    cache_test.go:74: hit: 100 miss: 0 ratio: 1.000000
+    cache_test.go:74: hit: 9825 miss: 175 ratio: 0.982500
+    cache_test.go:74: hit: 312345 miss: 687655 ratio: 0.312345
+    cache_test.go:74: hit: 1414620 miss: 3198028 ratio: 0.306683
+BenchmarkLRU_Rand_WithExpire-8   	 4109704	       286.5 ns/op
+--- BENCH: BenchmarkLRU_Rand_WithExpire-8
+    cache_test.go:99: hit: 0 miss: 1 ratio: 0.000000
+    cache_test.go:99: hit: 0 miss: 100 ratio: 0.000000
+    cache_test.go:99: hit: 1304 miss: 8696 ratio: 0.130400
+    cache_test.go:99: hit: 248310 miss: 751690 ratio: 0.248310
+    cache_test.go:99: hit: 1027317 miss: 3082387 ratio: 0.249973
+BenchmarkLRU_Freq_WithExpire-8   	 4341217	       279.6 ns/op
+--- BENCH: BenchmarkLRU_Freq_WithExpire-8
+    cache_test.go:127: hit: 1 miss: 0 ratio: 1.000000
+    cache_test.go:127: hit: 100 miss: 0 ratio: 1.000000
+    cache_test.go:127: hit: 9868 miss: 132 ratio: 0.986800
+    cache_test.go:127: hit: 38221 miss: 961779 ratio: 0.038221
+    cache_test.go:127: hit: 37296 miss: 4303921 ratio: 0.008591
+PASS
+ok  	github.com/go-pkgz/expirable-cache	18.307s
+```
+</details>
+
+<details> 
+<summary>v3</summary>
+
+```
+~/Desktop/expirable-cache/v3 master !2 ❯ go test -bench=.
+goos: darwin
+goarch: arm64
+pkg: github.com/go-pkgz/expirable-cache/v3
+BenchmarkLRU_Rand_NoExpire-8     	 7556680	       158.1 ns/op
+--- BENCH: BenchmarkLRU_Rand_NoExpire-8
+    cache_test.go:47: hit: 0 miss: 1 ratio: 0.000000
+    cache_test.go:47: hit: 0 miss: 100 ratio: 0.000000
+    cache_test.go:47: hit: 1409 miss: 8591 ratio: 0.140900
+    cache_test.go:47: hit: 249063 miss: 750937 ratio: 0.249063
+    cache_test.go:47: hit: 1887563 miss: 5669117 ratio: 0.249787
+BenchmarkLRU_Freq_NoExpire-8     	 7876738	       150.9 ns/op
+--- BENCH: BenchmarkLRU_Freq_NoExpire-8
+    cache_test.go:75: hit: 1 miss: 0 ratio: 1.000000
+    cache_test.go:75: hit: 100 miss: 0 ratio: 1.000000
+    cache_test.go:75: hit: 9850 miss: 150 ratio: 0.985000
+    cache_test.go:75: hit: 310888 miss: 689112 ratio: 0.310888
+    cache_test.go:75: hit: 2413312 miss: 5463426 ratio: 0.306385
+BenchmarkLRU_Rand_WithExpire-8   	 6822362	       175.3 ns/op
+--- BENCH: BenchmarkLRU_Rand_WithExpire-8
+    cache_test.go:100: hit: 0 miss: 1 ratio: 0.000000
+    cache_test.go:100: hit: 0 miss: 100 ratio: 0.000000
+    cache_test.go:100: hit: 1326 miss: 8674 ratio: 0.132600
+    cache_test.go:100: hit: 248508 miss: 751492 ratio: 0.248508
+    cache_test.go:100: hit: 1704172 miss: 5118190 ratio: 0.249792
+BenchmarkLRU_Freq_WithExpire-8   	 7098261	       168.1 ns/op
+--- BENCH: BenchmarkLRU_Freq_WithExpire-8
+    cache_test.go:128: hit: 1 miss: 0 ratio: 1.000000
+    cache_test.go:128: hit: 100 miss: 0 ratio: 1.000000
+    cache_test.go:128: hit: 9842 miss: 158 ratio: 0.984200
+    cache_test.go:128: hit: 90167 miss: 909833 ratio: 0.090167
+    cache_test.go:128: hit: 90421 miss: 7007840 ratio: 0.012738
+PASS
+ok  	github.com/go-pkgz/expirable-cache/v3	24.315s
+```
+</details>
