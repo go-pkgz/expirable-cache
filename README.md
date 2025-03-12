@@ -74,12 +74,59 @@ func main() {
 }
 ```
 
-### v3 performance improvements
+### Performance Comparison
 
-v3 (and v2) are done using generics and 38-42% faster than v1 without them according to benchmarks.
+For detailed benchmarks comparing different versions and cache implementations, see the [benchmarks](./benchmarks) directory.
+
+Based on all the benchmarks across four different caching libraries:
+
+1. **[go-pkgz/expirable-cache](https://github.com/go-pkgz/expirable-cache)** remains the best overall option:
+   - Excellent performance across all operations
+   - Lowest memory usage and allocations
+   - Type safety through generics
+   - Clean API with method chaining
+   - Simple implementation
+
+2. **[dgraph-io/ristretto](https://github.com/dgraph-io/ristretto)** is a strong contender for specific use cases:
+   - Great performance for read-heavy workloads
+   - Sophisticated memory management for very large caches
+   - Built-in metrics and statistics
+   - Designed for high-concurrency environments
+
+3. **[patrickmn/go-cache](https://github.com/patrickmn/go-cache)** is still fastest for pure raw performance but lacks modern features, and leaks goroutines
+
+4. **[jellydator/ttlcache](https://github.com/jellydator/ttlcache)** lags behind in performance compared to all other options.
+
+#### Version Improvements
+
+v2 and v3 use Go generics and achieve significant performance improvements over v1:
+
+- v2 is approximately **38-42% faster** than v1 for basic operations
+- v3 maintains the performance gains of v2 while being compatible with the Hashicorp `simplelru` interface
+
+#### Performance Comparison
+
+| Operation               | v1        | v2        | v3        | Improvement v1→v3 |
+|-------------------------|-----------|-----------|-----------|-------------------|
+| Random LRU (no expire)  | 272.4 ns/op | 160.1 ns/op | 158.1 ns/op | ~42% faster |
+| Frequency LRU (no expire) | 261.6 ns/op | 152.8 ns/op | 150.9 ns/op | ~42% faster |
+| Random LRU (with expire) | 286.5 ns/op | 177.6 ns/op | 175.3 ns/op | ~39% faster |
+| Frequency LRU (with expire) | 279.6 ns/op | 170.3 ns/op | 168.1 ns/op | ~40% faster |
+
+#### Cross-Library Comparison
+
+Recent benchmarks comparing expirable-cache with other popular Go caching libraries:
+
+| Operation | [go-pkgz/expirable-cache](https://github.com/go-pkgz/expirable-cache) | [patrickmn/go-cache](https://github.com/patrickmn/go-cache) | [jellydator/ttlcache](https://github.com/jellydator/ttlcache) | [dgraph-io/ristretto](https://github.com/dgraph-io/ristretto) |
+|-----------|-----------------|----------|----------|-----------|
+| Set | 69.65 ns/op | 84.63 ns/op | 430.7 ns/op | 793.8 ns/op |
+| Get | 78.27 ns/op | 66.29 ns/op | 193.1 ns/op | 82.61 ns/op |
+| Set+Get | 67.69 ns/op | 68.97 ns/op | 242.8 ns/op | 197.6 ns/op |
+| Real-world scenario | 79.98 ns/op | 70.60 ns/op | 200.0 ns/op | 85.88 ns/op |
+| Memory allocations | Lowest | Low | Medium | Highest |
 
 <details> 
-<summary>v1</summary>
+<summary>v1 benchmark results</summary>
 
 ```
 ~/expirable-cache ❯ go test -bench=.
@@ -120,7 +167,7 @@ ok  	github.com/go-pkgz/expirable-cache	18.307s
 </details>
 
 <details> 
-<summary>v3</summary>
+<summary>v3 benchmark results</summary>
 
 ```
 ~/Desktop/expirable-cache/v3 master !2 ❯ go test -bench=.
@@ -159,3 +206,7 @@ PASS
 ok  	github.com/go-pkgz/expirable-cache/v3	24.315s
 ```
 </details>
+
+<details> 
+
+For detailed benchmarks and methodology, see the [benchmarks directory](./benchmarks).
