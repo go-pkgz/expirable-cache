@@ -348,14 +348,6 @@ func (c *cacheImpl[K, V]) removeOldest() {
 	}
 }
 
-// removeOldest removes the oldest item from the cache in case it's already expired. Has to be called with lock!
-func (c *cacheImpl[K, V]) removeOldestIfExpired() {
-	ent := c.evictList.Back()
-	if ent != nil && time.Now().After(ent.Value.(*cacheItem[K, V]).expiresAt) {
-		c.removeElement(ent)
-	}
-}
-
 // removeElement is used to remove a given list element from the cache. Has to be called with lock!
 func (c *cacheImpl[K, V]) removeElement(e *list.Element) {
 	c.evictList.Remove(e)
