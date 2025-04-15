@@ -101,17 +101,18 @@ Based on all the benchmarks across four different caching libraries:
 
 v2 and v3 use Go generics and achieve significant performance improvements over v1:
 
-- v2 is approximately **38-42% faster** than v1 for basic operations
+- v2 is approximately **28-42% faster** than v1 for basic operations
 - v3 maintains the performance gains of v2 while being compatible with the Hashicorp `simplelru` interface
+- Recent optimizations have improved performance across all versions
 
 #### Performance Comparison
 
 | Operation               | v1        | v2        | v3        | Improvement v1→v3 |
 |-------------------------|-----------|-----------|-----------|-------------------|
-| Random LRU (no expire)  | 272.4 ns/op | 160.1 ns/op | 158.1 ns/op | ~42% faster |
-| Frequency LRU (no expire) | 261.6 ns/op | 152.8 ns/op | 150.9 ns/op | ~42% faster |
-| Random LRU (with expire) | 286.5 ns/op | 177.6 ns/op | 175.3 ns/op | ~39% faster |
-| Frequency LRU (with expire) | 279.6 ns/op | 170.3 ns/op | 168.1 ns/op | ~40% faster |
+| Random LRU (no expire)  | 188.3 ns/op | 127.5 ns/op | 132.3 ns/op | ~30% faster |
+| Frequency LRU (no expire) | 180.3 ns/op | 127.4 ns/op | 128.1 ns/op | ~29% faster |
+| Random LRU (with expire) | 191.9 ns/op | 129.7 ns/op | 130.7 ns/op | ~32% faster |
+| Frequency LRU (with expire) | 181.3 ns/op | 126.7 ns/op | 131.2 ns/op | ~28% faster |
 
 #### Cross-Library Comparison
 
@@ -119,10 +120,10 @@ Recent benchmarks comparing expirable-cache with other popular Go caching librar
 
 | Operation | [go-pkgz/expirable-cache](https://github.com/go-pkgz/expirable-cache) | [patrickmn/go-cache](https://github.com/patrickmn/go-cache) | [jellydator/ttlcache](https://github.com/jellydator/ttlcache) | [dgraph-io/ristretto](https://github.com/dgraph-io/ristretto) |
 |-----------|-----------------|----------|----------|-----------|
-| Set | 69.65 ns/op | 84.63 ns/op | 430.7 ns/op | 793.8 ns/op |
-| Get | 78.27 ns/op | 66.29 ns/op | 193.1 ns/op | 82.61 ns/op |
-| Set+Get | 67.69 ns/op | 68.97 ns/op | 242.8 ns/op | 197.6 ns/op |
-| Real-world scenario | 79.98 ns/op | 70.60 ns/op | 200.0 ns/op | 85.88 ns/op |
+| Set | 69.14 ns/op | 82.67 ns/op | 448.8 ns/op | 820.0 ns/op |
+| Get | 78.12 ns/op | 63.81 ns/op | 190.9 ns/op | 84.23 ns/op |
+| Set+Get | 66.62 ns/op | 67.94 ns/op | 253.9 ns/op | 198.2 ns/op |
+| Real-world scenario | 78.83 ns/op | 70.24 ns/op | 198.0 ns/op | 83.40 ns/op |
 | Memory allocations | Lowest | Low | Medium | Highest |
 
 <details> 
