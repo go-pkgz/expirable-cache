@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/golang-lru/v2/simplelru"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -126,10 +125,6 @@ func BenchmarkLRU_Freq_WithExpire(b *testing.B) {
 		}
 	}
 	b.Logf("hit: %d miss: %d ratio: %f", hit, miss, float64(hit)/float64(hit+miss))
-}
-
-func TestSimpleLRUInterface(_ *testing.T) {
-	var _ simplelru.LRUCache[int, int] = NewCache[int, int]()
 }
 
 func TestCacheNoPurge(t *testing.T) {
