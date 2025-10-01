@@ -30,7 +30,6 @@ type Cache[K comparable, V any] interface {
 	Add(key K, value V) bool
 	Set(key K, value V, ttl time.Duration)
 	Get(key K) (V, bool)
-	GetExpiration(key K) (time.Time, bool)
 	GetOldest() (K, V, bool)
 	Contains(key K) (ok bool)
 	Peek(key K) (V, bool)
@@ -185,21 +184,6 @@ func (c *cacheImpl[K, V]) Peek(key K) (V, bool) {
 	}
 	c.stat.Misses++
 	return def, false
-}
-
-// GetExpiration returns the expiration time of the key. Non-existing key returns zero time.
-// Note: Converts internal nanotime to time.Time for external API compatibility.
-func (c *cacheImpl[K, V]) GetExpiration(key K) (time.Time, bool) {
-	c.Lock()
-	defer c.Unlock()
-	if ent, ok := c.items[key]; ok {
-		expiresAtNano := ent.Value.(*cacheItem[K, V]).expiresAt
-		// Convert nanotime to time.Time by calculating duration from now
-		nowNano := nanotime()
-		durationUntilExpiry := time.Duration(expiresAtNano - nowNano)
-		return time.Now().Add(durationUntilExpiry), true
-	}
-	return time.Time{}, false
 }
 
 // Keys returns a slice of the keys in the cache, from oldest to newest.
