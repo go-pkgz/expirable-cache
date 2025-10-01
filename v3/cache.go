@@ -17,7 +17,11 @@ import (
 	"fmt"
 	"sync"
 	"time"
+	_ "unsafe"
 )
+
+//go:linkname nanotime runtime.nanotime
+func nanotime() int64
 
 // Cache defines cache interface
 type Cache[K comparable, V any] interface {
@@ -51,7 +55,7 @@ type Stats struct {
 
 // cacheImpl provides Cache interface implementation.
 type cacheImpl[K comparable, V any] struct {
-	ttl       time.Duration
+	ttl       int64 // TTL in nanoseconds
 	maxKeys   int
 	isLRU     bool
 	onEvicted func(key K, value V)
@@ -62,8 +66,8 @@ type cacheImpl[K comparable, V any] struct {
 	evictList *list.List
 }
 
-// noEvictionTTL - very long ttl to prevent eviction
-const noEvictionTTL = time.Hour * 24 * 365 * 10
+// noEvictionTTL - very long ttl to prevent eviction (10 years in nanoseconds)
+const noEvictionTTL = int64(time.Hour * 24 * 365 * 10)
 
 // NewCache returns a new Cache.
 // Default MaxKeys is unlimited (0).
@@ -87,38 +91,40 @@ func (c *cacheImpl[K, V]) Add(key K, value V) (evicted bool) {
 
 // Set key, ttl of 0 would use cache-wide TTL
 func (c *cacheImpl[K, V]) Set(key K, value V, ttl time.Duration) {
-	c.addWithTTL(key, value, ttl)
+	c.addWithTTL(key, value, int64(ttl))
 }
 
 // Returns true if an eviction occurred.
 // Returns false if there was no eviction: the item was already in the cache,
 // or the size was not exceeded.
-func (c *cacheImpl[K, V]) addWithTTL(key K, value V, ttl time.Duration) (evicted bool) {
+func (c *cacheImpl[K, V]) addWithTTL(key K, value V, ttl int64) (evicted bool) {
 	if ttl == 0 {
 		ttl = c.ttl
 	}
-	now := time.Now()
+	now := nanotime()
 	c.Lock()
 	defer c.Unlock()
 	// Check for existing item
 	if ent, ok := c.items[key]; ok {
 		c.evictList.MoveToFront(ent)
-		ent.Value.(*cacheItem[K, V]).value = value
-		ent.Value.(*cacheItem[K, V]).expiresAt = now.Add(ttl)
+		item := ent.Value.(*cacheItem[K, V]) // Single type assertion
+		item.value = value
+		item.expiresAt = now + ttl
 		return false
 	}
 
 	// Add new item
-	ent := &cacheItem[K, V]{key: key, value: value, expiresAt: now.Add(ttl)}
+	ent := &cacheItem[K, V]{key: key, value: value, expiresAt: now + ttl}
 	entry := c.evictList.PushFront(ent)
 	c.items[key] = entry
 	c.stat.Added++
 
 	// Remove the oldest entry if it is expired, only in case of non-default TTL.
 	if c.ttl != noEvictionTTL || ttl != noEvictionTTL {
-		ent := c.evictList.Back()
-		if ent != nil && now.After(ent.Value.(*cacheItem[K, V]).expiresAt) {
-			c.removeElement(ent)
+		if oldEnt := c.evictList.Back(); oldEnt != nil {
+			if now > oldEnt.Value.(*cacheItem[K, V]).expiresAt {
+				c.removeElement(oldEnt)
+			}
 		}
 	}
 
@@ -136,16 +142,17 @@ func (c *cacheImpl[K, V]) Get(key K) (V, bool) {
 	c.Lock()
 	defer c.Unlock()
 	if ent, ok := c.items[key]; ok {
+		item := ent.Value.(*cacheItem[K, V])
 		// Expired item check
-		if time.Now().After(ent.Value.(*cacheItem[K, V]).expiresAt) {
+		if nanotime() > item.expiresAt {
 			c.stat.Misses++
-			return ent.Value.(*cacheItem[K, V]).value, false
+			return item.value, false
 		}
 		if c.isLRU {
 			c.evictList.MoveToFront(ent)
 		}
 		c.stat.Hits++
-		return ent.Value.(*cacheItem[K, V]).value, true
+		return item.value, true
 	}
 	c.stat.Misses++
 	return def, false
@@ -167,24 +174,30 @@ func (c *cacheImpl[K, V]) Peek(key K) (V, bool) {
 	c.Lock()
 	defer c.Unlock()
 	if ent, ok := c.items[key]; ok {
+		item := ent.Value.(*cacheItem[K, V]) // Single type assertion
 		// Expired item check
-		if time.Now().After(ent.Value.(*cacheItem[K, V]).expiresAt) {
+		if nanotime() > item.expiresAt {
 			c.stat.Misses++
-			return ent.Value.(*cacheItem[K, V]).value, false
+			return item.value, false
 		}
 		c.stat.Hits++
-		return ent.Value.(*cacheItem[K, V]).value, true
+		return item.value, true
 	}
 	c.stat.Misses++
 	return def, false
 }
 
 // GetExpiration returns the expiration time of the key. Non-existing key returns zero time.
+// Note: Converts internal nanotime to time.Time for external API compatibility.
 func (c *cacheImpl[K, V]) GetExpiration(key K) (time.Time, bool) {
 	c.Lock()
 	defer c.Unlock()
 	if ent, ok := c.items[key]; ok {
-		return ent.Value.(*cacheItem[K, V]).expiresAt, true
+		expiresAtNano := ent.Value.(*cacheItem[K, V]).expiresAt
+		// Convert nanotime to time.Time by calculating duration from now
+		nowNano := nanotime()
+		durationUntilExpiry := time.Duration(expiresAtNano - nowNano)
+		return time.Now().Add(durationUntilExpiry), true
 	}
 	return time.Time{}, false
 }
@@ -200,11 +213,11 @@ func (c *cacheImpl[K, V]) Keys() []K {
 // Expired entries are filtered out.
 func (c *cacheImpl[K, V]) Values() []V {
 	values := make([]V, 0, len(c.items))
-	now := time.Now()
+	now := nanotime()
 	c.Lock()
 	defer c.Unlock()
 	for ent := c.evictList.Back(); ent != nil; ent = ent.Prev() {
-		if !now.After(ent.Value.(*cacheItem[K, V]).expiresAt) {
+		if now <= ent.Value.(*cacheItem[K, V]).expiresAt {
 			values = append(values, ent.Value.(*cacheItem[K, V]).value)
 		}
 	}
@@ -292,13 +305,13 @@ func (c *cacheImpl[K, V]) GetOldest() (key K, value V, ok bool) {
 
 // DeleteExpired clears cache of expired items
 func (c *cacheImpl[K, V]) DeleteExpired() {
-	now := time.Now()
+	now := nanotime()
 	c.Lock()
 	defer c.Unlock()
 	var nextEnt *list.Element
 	for ent := c.evictList.Back(); ent != nil; ent = nextEnt {
 		nextEnt = ent.Prev()
-		if now.After(ent.Value.(*cacheItem[K, V]).expiresAt) {
+		if now > ent.Value.(*cacheItem[K, V]).expiresAt {
 			c.removeElement(ent)
 		}
 	}
@@ -360,8 +373,9 @@ func (c *cacheImpl[K, V]) removeElement(e *list.Element) {
 }
 
 // cacheItem is used to hold a value in the evictList
+// Uses int64 nanotime instead of time.Time for 16 bytes memory savings per item
 type cacheItem[K comparable, V any] struct {
-	expiresAt time.Time
+	expiresAt int64 // nanotime() value - monotonic nanoseconds
 	key       K
 	value     V
 }

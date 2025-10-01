@@ -12,7 +12,7 @@ type options[K comparable, V any] interface {
 // WithTTL functional option defines TTL for all cache entries.
 // By default, it is set to 10 years, sane option for expirable cache might be 5 minutes.
 func (c *cacheImpl[K, V]) WithTTL(ttl time.Duration) Cache[K, V] {
-	c.ttl = ttl
+	c.ttl = int64(ttl) // Convert time.Duration to int64 nanoseconds
 	return c
 }
 
