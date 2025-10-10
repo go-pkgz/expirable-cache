@@ -28,6 +28,7 @@ type Cache[K comparable, V any] interface {
 	Get(key K) (V, bool)
 	GetExpiration(key K) (time.Time, bool)
 	GetOldest() (K, V, bool)
+	ContainsOrAdd(key K, value V) (bool, bool)
 	Contains(key K) (ok bool)
 	Peek(key K) (V, bool)
 	Values() []V
@@ -149,6 +150,23 @@ func (c *cacheImpl[K, V]) Get(key K) (V, bool) {
 	}
 	c.stat.Misses++
 	return def, false
+}
+
+// ContainsOrAdd checks if a key is in the cache without updating the
+// recent-ness or deleting it for being stale, and if not, adds the value.
+// Returns whether found and whether an eviction occurred.
+func (c *cacheImpl[K, V]) ContainsOrAdd(key K, value V) (bool, bool) {
+	c.Lock()
+
+	_, containsKey := c.items[key]
+	if containsKey {
+		c.Unlock()
+		return true, false
+	}
+
+	c.Unlock() //addWithTTL() Locks
+	evicted := c.addWithTTL(key, value, c.ttl)
+	return false, evicted
 }
 
 // Contains checks if a key is in the cache, without updating the recent-ness
