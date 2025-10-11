@@ -158,8 +158,7 @@ func (c *cacheImpl[K, V]) Get(key K) (V, bool) {
 func (c *cacheImpl[K, V]) ContainsOrAdd(key K, value V) (bool, bool) {
 	c.Lock()
 
-	_, containsKey := c.items[key]
-	if containsKey {
+	if _, containsKey := c.items[key]; containsKey {
 		c.Unlock()
 		return true, false
 	}

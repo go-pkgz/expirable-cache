@@ -83,14 +83,14 @@ func (c *cacheImpl[K, V]) Set(key K, value V, ttl time.Duration) {
 // Returns true if cache already contains the key. If the cache does
 // not contain the key, the key will be set with the value with the
 // default TTL.
-func (c *cacheImpl[K, V]) ContainsOrAdd(key K, value V) bool { 
+func (c *cacheImpl[K, V]) ContainsOrAdd(key K, value V) bool {
 
-	if _, ok := c.items[key]; ok { 
-		return true 
+	if _, ok := c.items[key]; ok {
+		return true
 	}
 
 	c.set(key, value, c.ttl)
-	return false 
+	return false
 }
 
 // Get returns the key value if it's not expired
@@ -232,6 +232,7 @@ func (c *cacheImpl[K, V]) removeOldest() {
 	}
 }
 
+// Set key, ttl of 0 would use cache-wide TTL
 func (c *cacheImpl[K, V]) set(key K, value V, ttl time.Duration) {
 	if ttl == 0 {
 		ttl = c.ttl
@@ -265,7 +266,6 @@ func (c *cacheImpl[K, V]) set(key K, value V, ttl time.Duration) {
 		c.removeOldest()
 	}
 }
-
 
 // removeElement is used to remove a given list element from the cache. Has to be called with lock!
 func (c *cacheImpl[K, V]) removeElement(e *list.Element) {
