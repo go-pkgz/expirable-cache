@@ -83,11 +83,17 @@ func NewCache[K comparable, V any]() Cache[K, V] {
 // Returns false if there was no eviction: the item was already in the cache,
 // or the size was not exceeded.
 func (c *cacheImpl[K, V]) Add(key K, value V) (evicted bool) {
+	c.Lock()
+	defer c.Unlock()
+
 	return c.addWithTTL(key, value, c.ttl)
 }
 
 // Set key, ttl of 0 would use cache-wide TTL
 func (c *cacheImpl[K, V]) Set(key K, value V, ttl time.Duration) {
+	c.Lock()
+	defer c.Unlock()
+
 	c.addWithTTL(key, value, ttl)
 }
 
@@ -99,8 +105,7 @@ func (c *cacheImpl[K, V]) addWithTTL(key K, value V, ttl time.Duration) (evicted
 		ttl = c.ttl
 	}
 	now := time.Now()
-	c.Lock()
-	defer c.Unlock()
+
 	// Check for existing item
 	if ent, ok := c.items[key]; ok {
 		c.evictList.MoveToFront(ent)
@@ -157,13 +162,12 @@ func (c *cacheImpl[K, V]) Get(key K) (V, bool) {
 // Returns whether found and whether an eviction occurred.
 func (c *cacheImpl[K, V]) ContainsOrAdd(key K, value V) (bool, bool) {
 	c.Lock()
+	defer c.Unlock()
 
 	if _, containsKey := c.items[key]; containsKey {
-		c.Unlock()
 		return true, false
 	}
 
-	c.Unlock() //addWithTTL() Locks
 	evicted := c.addWithTTL(key, value, c.ttl)
 	return false, evicted
 }
