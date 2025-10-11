@@ -411,7 +411,12 @@ func TestCacheContainsOrAdd(t *testing.T) {
 	assert.Equal(t, false, contains)
 	assert.Equal(t, true, evicted)
 
-	_, ok := lc.Get("key1")
+	val, ok := lc.Get("key3")
+	assert.Equal(t, true, ok)
+	assert.Equal(t, "val3", val)
+
+	// Make sure key1 evicted
+	_, ok = lc.Get("key1")
 	assert.Equal(t, false, ok)
 }
 

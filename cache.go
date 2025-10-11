@@ -238,6 +238,7 @@ func (c *cacheImpl) removeOldest() {
 	}
 }
 
+// Set key, ttl of 0 would use cache-wide TTL
 func (c *cacheImpl) set(key string, value interface{}, ttl time.Duration) {
 	if ttl == 0 {
 		ttl = c.ttl
