@@ -23,7 +23,7 @@ import (
 type Cache[K comparable, V any] interface {
 	fmt.Stringer
 	options[K, V]
-	ContainsOrAdd(key K, value V) bool
+	ContainsOrSet(key K, value V, ttl time.Duration) bool
 	Set(key K, value V, ttl time.Duration)
 	Get(key K) (V, bool)
 	Peek(key K) (V, bool)
@@ -81,15 +81,17 @@ func (c *cacheImpl[K, V]) Set(key K, value V, ttl time.Duration) {
 }
 
 // Returns true if cache already contains the key. If the cache does
-// not contain the key, the key will be set with the value with the
-// default TTL.
-func (c *cacheImpl[K, V]) ContainsOrAdd(key K, value V) bool {
+// not contain the key, the key will be set with the value and return false
+func (c *cacheImpl[K, V]) ContainsOrSet(key K, value V, ttl time.Duration) bool {
+
+	c.Lock()
+	defer c.Unlock()
 
 	if _, ok := c.items[key]; ok {
 		return true
 	}
 
-	c.set(key, value, c.ttl)
+	c.set(key, value, ttl)
 	return false
 }
 

@@ -302,10 +302,10 @@ func TestCacheContainsOrAdd(t *testing.T) {
 	lc.Set("key2", "val2", 0)
 	assert.Equal(t, 2, lc.Len())
 
-	contains := lc.ContainsOrAdd("key1", "value")
+	contains := lc.ContainsOrSet("key1", "value", 0)
 	assert.Equal(t, true, contains)
 
-	contains = lc.ContainsOrAdd("key3", "val3")
+	contains = lc.ContainsOrSet("key3", "val3", 0)
 	assert.Equal(t, false, contains)
 
 	_, ok := lc.Get("key1")

@@ -22,6 +22,7 @@ import (
 // Cache defines cache interface
 type Cache interface {
 	fmt.Stringer
+	ContainsOrSet(key string, value interface{}, ttl time.Duration) bool
 	Set(key string, value interface{}, ttl time.Duration)
 	Get(key string) (interface{}, bool)
 	Peek(key string) (interface{}, bool)
@@ -77,41 +78,27 @@ func NewCache(options ...Option) (Cache, error) {
 	return &res, nil
 }
 
-// Set key, ttl of 0 would use cache-wide TTL
-func (c *cacheImpl) Set(key string, value interface{}, ttl time.Duration) {
-	if ttl == 0 {
-		ttl = c.ttl
-	}
-	now := time.Now()
+// Returns true if cache already contains the key. If the cache does
+// not contain the key, the key will be set with the value and return false
+func (c *cacheImpl) ContainsOrSet(key string, value interface{}, ttl time.Duration) bool {
+
 	c.Lock()
 	defer c.Unlock()
 
-	// Check for existing item
-	if ent, ok := c.items[key]; ok {
-		c.evictList.MoveToFront(ent)
-		ent.Value.(*cacheItem).value = value
-		ent.Value.(*cacheItem).expiresAt = now.Add(ttl)
-		return
+	if _, ok := c.items[key]; ok {
+		return true
 	}
 
-	// Add new item
-	ent := &cacheItem{key: key, value: value, expiresAt: now.Add(ttl)}
-	entry := c.evictList.PushFront(ent)
-	c.items[key] = entry
-	c.stat.Added++
+	c.set(key, value, ttl)
+	return false
+}
 
-	// Remove oldest entry if it is expired, only in case of non-default TTL.
-	if c.ttl != noEvictionTTL || ttl != noEvictionTTL {
-		ent := c.evictList.Back()
-		if ent != nil && now.After(ent.Value.(*cacheItem).expiresAt) {
-			c.removeElement(ent)
-		}
-	}
+// Set key, ttl of 0 would use cache-wide TTL
+func (c *cacheImpl) Set(key string, value interface{}, ttl time.Duration) {
+	c.Lock()
+	defer c.Unlock()
 
-	// Verify size not exceeded
-	if c.maxKeys > 0 && len(c.items) > c.maxKeys {
-		c.removeOldest()
-	}
+	c.set(key, value, ttl)
 }
 
 // Get returns the key value if it's not expired
@@ -251,6 +238,39 @@ func (c *cacheImpl) removeOldest() {
 	}
 }
 
+func (c *cacheImpl) set(key string, value interface{}, ttl time.Duration) {
+	if ttl == 0 {
+		ttl = c.ttl
+	}
+	now := time.Now()
+
+	// Check for existing item
+	if ent, ok := c.items[key]; ok {
+		c.evictList.MoveToFront(ent)
+		ent.Value.(*cacheItem).value = value
+		ent.Value.(*cacheItem).expiresAt = now.Add(ttl)
+		return
+	}
+
+	// Add new item
+	ent := &cacheItem{key: key, value: value, expiresAt: now.Add(ttl)}
+	entry := c.evictList.PushFront(ent)
+	c.items[key] = entry
+	c.stat.Added++
+
+	// Remove oldest entry if it is expired, only in case of non-default TTL.
+	if c.ttl != noEvictionTTL || ttl != noEvictionTTL {
+		ent := c.evictList.Back()
+		if ent != nil && now.After(ent.Value.(*cacheItem).expiresAt) {
+			c.removeElement(ent)
+		}
+	}
+
+	// Verify size not exceeded
+	if c.maxKeys > 0 && len(c.items) > c.maxKeys {
+		c.removeOldest()
+	}
+}
 
 // removeElement is used to remove a given list element from the cache. Has to be called with lock!
 func (c *cacheImpl) removeElement(e *list.Element) {

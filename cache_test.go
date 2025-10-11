@@ -309,6 +309,26 @@ func TestCacheRemoveOldest(t *testing.T) {
 	assert.Equal(t, 1, lc.Len())
 }
 
+func TestCacheContainsOrAdd(t *testing.T) {
+	lc, err := NewCache(LRU(), MaxKeys(2))
+	assert.NoError(t, err)
+
+	lc.Set("key1", "val1", 0)
+	assert.Equal(t, 1, lc.Len())
+
+	lc.Set("key2", "val2", 0)
+	assert.Equal(t, 2, lc.Len())
+
+	contains := lc.ContainsOrSet("key1", "value", 0)
+	assert.Equal(t, true, contains)
+
+	contains = lc.ContainsOrSet("key3", "val3", 0)
+	assert.Equal(t, false, contains)
+
+	_, ok := lc.Get("key1")
+	assert.Equal(t, false, ok)
+}
+
 func ExampleCache() {
 	// make cache with short TTL and 3 max keys
 	cache, _ := NewCache(MaxKeys(3), TTL(time.Millisecond*10))
