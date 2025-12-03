@@ -1,28 +1,14 @@
-linters-settings:
-  govet:
-    enable:
-      - shadow
-  gocyclo:
-    min-complexity: 15
-  misspell:
-    locale: US
-  gocritic:
-    enabled-tags:
-      - performance
-      - style
-      - experimental
-    disabled-checks:
-      - wrapperFunc
-
+version: "2"
+run:
+  concurrency: 4
 linters:
+  default: none
   enable:
     - dupl
-    - exportloopref
     - gochecknoinits
     - gocritic
     - gocyclo
     - gosec
-    - gosimple
     - govet
     - ineffassign
     - misspell
@@ -30,9 +16,29 @@ linters:
     - prealloc
     - revive
     - staticcheck
-    - stylecheck
-    - typecheck
     - unconvert
     - unused
-  fast: false
-  disable-all: true
+  settings:
+    gocyclo:
+      min-complexity: 15
+    gocritic:
+      disabled-checks:
+        - wrapperFunc
+      enabled-tags:
+        - performance
+        - style
+        - experimental
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+    misspell:
+      locale: US
+
+  exclusions:
+    generated: lax
+    paths:
+      - vendor
+      - third_party$
+      - builtin$
+      - examples$
