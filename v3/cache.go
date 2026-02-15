@@ -28,6 +28,7 @@ type Cache[K comparable, V any] interface {
 	Get(key K) (V, bool)
 	GetExpiration(key K) (time.Time, bool)
 	GetOldest() (K, V, bool)
+	ContainsOrAdd(key K, value V) (bool, bool)
 	Contains(key K) (ok bool)
 	Peek(key K) (V, bool)
 	Values() []V
@@ -82,11 +83,17 @@ func NewCache[K comparable, V any]() Cache[K, V] {
 // Returns false if there was no eviction: the item was already in the cache,
 // or the size was not exceeded.
 func (c *cacheImpl[K, V]) Add(key K, value V) (evicted bool) {
+	c.Lock()
+	defer c.Unlock()
+
 	return c.addWithTTL(key, value, c.ttl)
 }
 
 // Set key, ttl of 0 would use cache-wide TTL
 func (c *cacheImpl[K, V]) Set(key K, value V, ttl time.Duration) {
+	c.Lock()
+	defer c.Unlock()
+
 	c.addWithTTL(key, value, ttl)
 }
 
@@ -98,8 +105,7 @@ func (c *cacheImpl[K, V]) addWithTTL(key K, value V, ttl time.Duration) (evicted
 		ttl = c.ttl
 	}
 	now := time.Now()
-	c.Lock()
-	defer c.Unlock()
+
 	// Check for existing item
 	if ent, ok := c.items[key]; ok {
 		c.evictList.MoveToFront(ent)
@@ -149,6 +155,21 @@ func (c *cacheImpl[K, V]) Get(key K) (V, bool) {
 	}
 	c.stat.Misses++
 	return def, false
+}
+
+// ContainsOrAdd checks if a key is in the cache without updating the
+// recent-ness or deleting it for being stale, and if not, adds the value.
+// Returns whether found and whether an eviction occurred.
+func (c *cacheImpl[K, V]) ContainsOrAdd(key K, value V) (bool, bool) {
+	c.Lock()
+	defer c.Unlock()
+
+	if _, containsKey := c.items[key]; containsKey {
+		return true, false
+	}
+
+	evicted := c.addWithTTL(key, value, c.ttl)
+	return false, evicted
 }
 
 // Contains checks if a key is in the cache, without updating the recent-ness
