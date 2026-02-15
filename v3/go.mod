@@ -1,6 +1,6 @@
 module github.com/go-pkgz/expirable-cache/v3
 
-go 1.20
+go 1.23
 
 require github.com/stretchr/testify v1.10.0
 
