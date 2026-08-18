@@ -46,9 +46,10 @@ BenchmarkRistretto_RealWorldScenario-8              	11046955	       105.6 ns/op
 Ristretto applies writes asynchronously: `Set` only queues the write and returns, and the value may
 not be readable, or may be dropped altogether, until the queue is drained. Every benchmark here calls
 `cache.Wait()` after a timed `Set`, so the reported write cost includes applying the write and the
-numbers describe the same unit of work as the synchronous `Set` of the other libraries. Writes
-rejected by the admission policy are counted and reported as a `drops/op` metric; there were none in
-the run above.
+numbers describe the same unit of work as the synchronous `Set` of the other libraries. Writes that
+`Set` refuses because the write buffer is full are counted and reported as a `drops/op` metric; there
+were none in the run above. A write that `Set` accepts can still be discarded later by the admission
+policy, so the metric is a lower bound.
 
 ## Summary of Results
 

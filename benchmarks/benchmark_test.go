@@ -38,8 +38,9 @@ func generateRandomItems(n int) []testItem {
 	return items
 }
 
-// reportDropped reports ristretto writes rejected by its admission policy,
-// they are silently discarded and would otherwise inflate the results
+// reportDropped reports ristretto writes refused because its write buffer was full,
+// they are silently discarded. A write accepted by Set can still be discarded later by
+// the admission policy, so this is a lower bound on the writes that never landed
 func reportDropped(b *testing.B, dropped int) {
 	if dropped > 0 {
 		b.ReportMetric(float64(dropped)/float64(b.N), "drops/op")

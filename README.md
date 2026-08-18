@@ -43,17 +43,17 @@ import (
 
 func main() {
 	// make cache with short TTL and 3 max keys
-	c := cache.NewCache[string, string]().WithMaxKeys(3).WithTTL(time.Millisecond * 10)
+	c := cache.NewCache[string, string]().WithMaxKeys(3).WithTTL(time.Millisecond * 100)
 
 	// set value under key1.
-	// with 0 ttl (last parameter) will use cache-wide setting instead (10ms).
+	// with 0 ttl (last parameter) will use cache-wide setting instead (100ms).
 	c.Set("key1", "val1", 0)
 
 	// get value under key1
 	r, ok := c.Get("key1")
 	fmt.Printf("value before expiration is found: %v, value: %v\n", ok, r)
 
-	time.Sleep(time.Millisecond * 11)
+	time.Sleep(time.Millisecond * 110)
 
 	// get value under key1 after key expiration.
 	// expired entry is not removed until something touches it, so the stored value
