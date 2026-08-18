@@ -97,7 +97,7 @@ Based on all the benchmarks across four different caching libraries:
 
 3. **[patrickmn/go-cache](https://github.com/patrickmn/go-cache)** is still the fastest for reads but lacks modern features, and leaks goroutines
 
-4. **[jellydator/ttlcache](https://github.com/jellydator/ttlcache)** lags behind in performance compared to all other options.
+4. **[jellydator/ttlcache](https://github.com/jellydator/ttlcache)** lags behind in speed, two to three times slower than the leaders, although its memory usage is now on par with them.
 
 #### Version Improvements
 
@@ -122,11 +122,11 @@ Recent benchmarks comparing expirable-cache with other popular Go caching librar
 
 | Operation | [go-pkgz/expirable-cache](https://github.com/go-pkgz/expirable-cache) | [patrickmn/go-cache](https://github.com/patrickmn/go-cache) | [jellydator/ttlcache](https://github.com/jellydator/ttlcache) | [dgraph-io/ristretto](https://github.com/dgraph-io/ristretto) |
 |-----------|-----------------|----------|----------|-----------|
-| Set | 64.96 ns/op | 82.81 ns/op | 381.0 ns/op | 777.2 ns/op |
-| Get | 77.67 ns/op | 65.95 ns/op | 193.4 ns/op | 81.51 ns/op |
-| Set+Get | 64.68 ns/op | 68.13 ns/op | 229.9 ns/op | 522.4 ns/op |
-| Real-world scenario | 80.00 ns/op | 70.83 ns/op | 203.0 ns/op | 98.00 ns/op |
-| Memory allocations | Lowest | Low | Medium | Highest |
+| Set | 65.59 ns/op | 79.87 ns/op | 256.7 ns/op | 778.9 ns/op |
+| Get | 80.98 ns/op | 67.82 ns/op | 191.0 ns/op | 78.75 ns/op |
+| Set+Get | 65.93 ns/op | 69.63 ns/op | 198.9 ns/op | 528.7 ns/op |
+| Real-world scenario | 82.28 ns/op | 70.87 ns/op | 189.5 ns/op | 105.6 ns/op |
+| Memory allocations | Lowest | Low | Low | Highest |
 
 <details> 
 <summary>v1 benchmark results</summary>
