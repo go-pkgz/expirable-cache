@@ -78,9 +78,10 @@ func NewCache[K comparable, V any]() Cache[K, V] {
 	}
 }
 
-// Add adds a value to the cache. Returns true if an eviction occurred.
+// Add adds a value to the cache. Returns true if an eviction occurred, either
+// because the size was exceeded or because the oldest entry expired.
 // Returns false if there was no eviction: the item was already in the cache,
-// or the size was not exceeded.
+// or nothing had to be removed.
 func (c *cacheImpl[K, V]) Add(key K, value V) (evicted bool) {
 	return c.addWithTTL(key, value, c.ttl)
 }
@@ -90,9 +91,10 @@ func (c *cacheImpl[K, V]) Set(key K, value V, ttl time.Duration) {
 	c.addWithTTL(key, value, ttl)
 }
 
-// Returns true if an eviction occurred.
+// Returns true if an eviction occurred, either because the size was exceeded
+// or because the oldest entry expired.
 // Returns false if there was no eviction: the item was already in the cache,
-// or the size was not exceeded.
+// or nothing had to be removed.
 func (c *cacheImpl[K, V]) addWithTTL(key K, value V, ttl time.Duration) (evicted bool) {
 	if ttl == 0 {
 		ttl = c.ttl
@@ -119,15 +121,16 @@ func (c *cacheImpl[K, V]) addWithTTL(key K, value V, ttl time.Duration) (evicted
 		ent := c.evictList.Back()
 		if ent != nil && now.After(ent.Value.(*cacheItem[K, V]).expiresAt) {
 			c.removeElement(ent)
+			evicted = true
 		}
 	}
 
-	evict := c.maxKeys > 0 && len(c.items) > c.maxKeys
 	// Verify size not exceeded
-	if evict {
+	if c.maxKeys > 0 && len(c.items) > c.maxKeys {
 		c.removeOldest()
+		evicted = true
 	}
-	return evict
+	return evicted
 }
 
 // Get returns the key value if it's not expired

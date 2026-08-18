@@ -106,3 +106,21 @@ func TestCache_GetExpiration(t *testing.T) {
 		assert.Zero(t, exp)
 	})
 }
+
+func TestCacheAddEvictsExpired(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var evicted []string
+		lc := NewCache[string, string]().WithTTL(time.Second * 5).WithOnEvicted(
+			func(key string, value string) {
+				evicted = append(evicted, key, value)
+			})
+
+		assert.False(t, lc.Add("key1", "val1"), "nothing to evict on the first add")
+
+		time.Sleep(time.Second * 10) // expire key1
+
+		assert.True(t, lc.Add("key2", "val2"), "expired key1 evicted by the second add")
+		assert.Equal(t, []string{"key1", "val1"}, evicted)
+		assert.Equal(t, 1, lc.Len())
+	})
+}

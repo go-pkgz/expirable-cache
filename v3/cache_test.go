@@ -364,3 +364,13 @@ func TestCacheValuesConcurrency(_ *testing.T) {
 
 	wg.Wait()
 }
+
+func TestCacheAddEvictsOnSize(t *testing.T) {
+	lc := NewCache[string, string]().WithMaxKeys(2)
+
+	assert.False(t, lc.Add("key1", "val1"), "nothing to evict yet")
+	assert.False(t, lc.Add("key2", "val2"), "size not exceeded")
+	assert.True(t, lc.Add("key3", "val3"), "size exceeded, oldest entry evicted")
+	assert.False(t, lc.Add("key3", "val3-updated"), "existing key updated, nothing evicted")
+	assert.Equal(t, 2, lc.Len())
+}
