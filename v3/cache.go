@@ -8,6 +8,9 @@
 // In case of default TTL (10 years) and default MaxSize (0, unlimited) the cache will be truly unlimited
 // and will never delete entries from itself automatically.
 //
+// Get, Peek, Contains and Values treat an expired entry as missing, while Len and Keys report
+// everything the cache still holds, expired entries included.
+//
 // Important: only reliable way of not having expired entries stuck in a cache is to
 // run cache.DeleteExpired periodically using time.Ticker, advisable period is 1/2 of TTL.
 package cache
@@ -155,12 +158,15 @@ func (c *cacheImpl[K, V]) Get(key K) (V, bool) {
 }
 
 // Contains checks if a key is in the cache, without updating the recent-ness
-// or deleting it for being stale.
+// or deleting it for being stale. Expired entries are reported as missing.
 func (c *cacheImpl[K, V]) Contains(key K) (ok bool) {
 	c.Lock()
 	defer c.Unlock()
-	_, ok = c.items[key]
-	return ok
+	ent, ok := c.items[key]
+	if !ok {
+		return false
+	}
+	return !time.Now().After(ent.Value.(*cacheItem[K, V]).expiresAt)
 }
 
 // Peek returns the key value (or undefined if not found) without updating the "recently used"-ness of the key.

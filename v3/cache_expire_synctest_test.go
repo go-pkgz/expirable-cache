@@ -124,3 +124,21 @@ func TestCacheAddEvictsExpired(t *testing.T) {
 		assert.Equal(t, 1, lc.Len())
 	})
 }
+
+func TestCacheContainsExpired(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		lc := NewCache[string, string]().WithTTL(time.Second * 5)
+		lc.Set("key1", "val1", 0)
+		assert.True(t, lc.Contains("key1"))
+
+		time.Sleep(time.Second * 10) // expire key1
+
+		assert.False(t, lc.Contains("key1"), "expired entry is reported as missing")
+		assert.Equal(t, []string{"key1"}, lc.Keys(), "but it is still held until purged")
+		assert.Equal(t, 1, lc.Len())
+
+		lc.DeleteExpired()
+		assert.False(t, lc.Contains("key1"))
+		assert.Empty(t, lc.Keys())
+	})
+}
