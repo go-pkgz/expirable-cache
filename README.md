@@ -14,13 +14,17 @@ either using LRC or LRU eviction.
 - In case of default TTL (10 years) and default MaxSize (0, unlimited) the cache will be truly unlimited
  and will never delete entries from itself automatically.
 
+Latest version is v3, it requires Go 1.23 or later; v2 and v1 require Go 1.20 or later. Only v3 is actively developed.
+
 **Important**: only reliable way of not having expired entries stuck in a cache is to
 run cache.DeleteExpired periodically using [time.Ticker](https://golang.org/pkg/time/#Ticker),
 advisable period is 1/2 of TTL.
 
 This cache is heavily inspired by [hashicorp/golang-lru](https://github.com/hashicorp/golang-lru) _simplelru_ implementation. v3 implements `simplelru.LRUCache` interface, so if you use a subset of functions, so you can switch from `github.com/hashicorp/golang-lru/v2/simplelru` or `github.com/hashicorp/golang-lru/v2/expirable` without any changes in your code except for cache creation. Key differences are:
 
-- Support LRC (Least Recently Created) in addition to LRU and TTL-based eviction
+- Support LRC (Least Recently Created) in addition to LRU and TTL-based eviction. In LRC mode the eviction order is
+defined by the time of the last write: setting an existing key moves it to the front, while reads leave the order
+untouched, which is what LRU mode adds
 - Supports per-key TTL setting
 - Doesn't spawn any goroutines, whereas `hashicorp/golang-lru/v2/expirable` spawns goroutine which is never killed ([as of now](https://github.com/hashicorp/golang-lru/issues/159))
 - Provides stats about hits and misses, added and evicted entries
@@ -34,7 +38,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-pkgz/expirable-cache/v3"
+	cache "github.com/go-pkgz/expirable-cache/v3"
 )
 
 func main() {
@@ -47,29 +51,25 @@ func main() {
 
 	// get value under key1
 	r, ok := c.Get("key1")
-
-	// check for OK value, because otherwise return would be nil and
-	// type conversion will panic
-	if ok {
-		rstr := r.(string) // convert cached value from interface{} to real type
-		fmt.Printf("value before expiration is found: %v, value: %v\n", ok, rstr)
-	}
+	fmt.Printf("value before expiration is found: %v, value: %v\n", ok, r)
 
 	time.Sleep(time.Millisecond * 11)
 
-	// get value under key1 after key expiration
+	// get value under key1 after key expiration.
+	// expired entry is not removed until something touches it, so the stored value
+	// is still returned, with ok set to false
 	r, ok = c.Get("key1")
-	// don't convert to string as with ok == false value would be nil
 	fmt.Printf("value after expiration is found: %v, value: %v\n", ok, r)
 
-	// set value under key2, would evict old entry because it is already expired.
+	// set value under key2, would evict key1 because it is already expired.
 	// ttl (last parameter) overrides cache-wide ttl.
 	c.Set("key2", "val2", time.Minute*5)
 
 	fmt.Printf("%+v\n", c)
+
 	// Output:
 	// value before expiration is found: true, value: val1
-	// value after expiration is found: false, value: <nil>
+	// value after expiration is found: false, value: val1
 	// Size: 1, Stats: {Hits:1 Misses:1 Added:2 Evicted:1} (50.0%)
 }
 ```
@@ -92,8 +92,10 @@ Based on all the benchmarks across four different caching libraries:
    - Sophisticated memory management for very large caches
    - Built-in metrics and statistics
    - Designed for high-concurrency environments
+   - Writes are asynchronous, so they are cheap to issue but expensive to complete, see the
+     [methodology note](./benchmarks/README.md#methodology-note-on-ristretto) in the benchmarks
 
-3. **[patrickmn/go-cache](https://github.com/patrickmn/go-cache)** is still fastest for pure raw performance but lacks modern features, and leaks goroutines
+3. **[patrickmn/go-cache](https://github.com/patrickmn/go-cache)** is still the fastest for reads but lacks modern features, and leaks goroutines
 
 4. **[jellydator/ttlcache](https://github.com/jellydator/ttlcache)** lags behind in performance compared to all other options.
 
@@ -120,10 +122,10 @@ Recent benchmarks comparing expirable-cache with other popular Go caching librar
 
 | Operation | [go-pkgz/expirable-cache](https://github.com/go-pkgz/expirable-cache) | [patrickmn/go-cache](https://github.com/patrickmn/go-cache) | [jellydator/ttlcache](https://github.com/jellydator/ttlcache) | [dgraph-io/ristretto](https://github.com/dgraph-io/ristretto) |
 |-----------|-----------------|----------|----------|-----------|
-| Set | 69.14 ns/op | 82.67 ns/op | 448.8 ns/op | 820.0 ns/op |
-| Get | 78.12 ns/op | 63.81 ns/op | 190.9 ns/op | 84.23 ns/op |
-| Set+Get | 66.62 ns/op | 67.94 ns/op | 253.9 ns/op | 198.2 ns/op |
-| Real-world scenario | 78.83 ns/op | 70.24 ns/op | 198.0 ns/op | 83.40 ns/op |
+| Set | 64.96 ns/op | 82.81 ns/op | 381.0 ns/op | 777.2 ns/op |
+| Get | 77.67 ns/op | 65.95 ns/op | 193.4 ns/op | 81.51 ns/op |
+| Set+Get | 64.68 ns/op | 68.13 ns/op | 229.9 ns/op | 522.4 ns/op |
+| Real-world scenario | 80.00 ns/op | 70.83 ns/op | 203.0 ns/op | 98.00 ns/op |
 | Memory allocations | Lowest | Low | Medium | Highest |
 
 <details> 
