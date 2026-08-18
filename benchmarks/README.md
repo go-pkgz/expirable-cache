@@ -19,38 +19,48 @@ goos: darwin
 goarch: arm64
 pkg: github.com/go-pkgz/expirable-cache/benchmarks
 cpu: Apple M3
-BenchmarkGoCache_Set-8                              12169099        82.67 ns/op       68 B/op       1 allocs/op
-BenchmarkGoCache_Get-8                              18444500        63.81 ns/op        3 B/op       0 allocs/op
-BenchmarkGoCache_SetAndGet-8                        17692840        67.94 ns/op       36 B/op       1 allocs/op
-BenchmarkTTLCache_Set-8                              2707100       448.8 ns/op         5 B/op       0 allocs/op
-BenchmarkTTLCache_Get-8                              6269760       190.9 ns/op        51 B/op       1 allocs/op
-BenchmarkTTLCache_SetAndGet-8                        4806730       253.9 ns/op        28 B/op       1 allocs/op
-BenchmarkExpirableCache_Set-8                       17192541        69.14 ns/op        4 B/op       0 allocs/op
-BenchmarkExpirableCache_Get-8                       15239731        78.12 ns/op        3 B/op       0 allocs/op
-BenchmarkExpirableCache_SetAndGet-8                 17954317        66.62 ns/op        4 B/op       0 allocs/op
-BenchmarkRistretto_Set-8                             1456555       820.0 ns/op       262 B/op       5 allocs/op
-BenchmarkRistretto_Get-8                            14321246        84.23 ns/op       27 B/op       2 allocs/op
-BenchmarkRistretto_SetAndGet-8                       5989928       198.2 ns/op        96 B/op       2 allocs/op
-BenchmarkGoCache_GetWithTypeAssertion-8             17971783        66.44 ns/op        3 B/op       0 allocs/op
-BenchmarkTTLCache_GetWithoutTypeAssertion-8          6114782       197.9 ns/op        51 B/op       1 allocs/op
-BenchmarkExpirableCache_GetWithoutTypeAssertion-8   15095240        78.39 ns/op        3 B/op       0 allocs/op
-BenchmarkRistretto_GetWithTypeAssertion-8           14458339        83.09 ns/op       27 B/op       2 allocs/op
-BenchmarkGoCache_RealWorldScenario-8                16622580        70.24 ns/op        4 B/op       0 allocs/op
-BenchmarkTTLCache_RealWorldScenario-8                6038209       198.0 ns/op        52 B/op       1 allocs/op
-BenchmarkExpirableCache_RealWorldScenario-8         14718102        78.83 ns/op        3 B/op       0 allocs/op
-BenchmarkRistretto_RealWorldScenario-8              13030276        83.40 ns/op       28 B/op       2 allocs/op
+BenchmarkGoCache_Set-8                              	14435580	        79.87 ns/op	      67 B/op	       1 allocs/op
+BenchmarkGoCache_Get-8                              	18228678	        67.82 ns/op	       3 B/op	       0 allocs/op
+BenchmarkGoCache_SetAndGet-8                        	17382297	        69.63 ns/op	      36 B/op	       1 allocs/op
+BenchmarkTTLCache_Set-8                             	 4442306	       256.7 ns/op	       4 B/op	       0 allocs/op
+BenchmarkTTLCache_Get-8                             	 6576498	       191.0 ns/op	       3 B/op	       0 allocs/op
+BenchmarkTTLCache_SetAndGet-8                       	 6569042	       198.9 ns/op	       4 B/op	       0 allocs/op
+BenchmarkExpirableCache_Set-8                       	17978492	        65.59 ns/op	       4 B/op	       0 allocs/op
+BenchmarkExpirableCache_Get-8                       	14897770	        80.98 ns/op	       3 B/op	       0 allocs/op
+BenchmarkExpirableCache_SetAndGet-8                 	18371962	        65.93 ns/op	       4 B/op	       0 allocs/op
+BenchmarkRistretto_Set-8                            	 1540219	       778.9 ns/op	     262 B/op	       5 allocs/op
+BenchmarkRistretto_Get-8                            	14860327	        78.75 ns/op	      27 B/op	       2 allocs/op
+BenchmarkRistretto_SetAndGet-8                      	 2286632	       528.7 ns/op	     144 B/op	       3 allocs/op
+BenchmarkGoCache_GetWithTypeAssertion-8             	18340864	        67.55 ns/op	       3 B/op	       0 allocs/op
+BenchmarkTTLCache_GetWithoutTypeAssertion-8         	 6430896	       190.9 ns/op	       3 B/op	       0 allocs/op
+BenchmarkExpirableCache_GetWithoutTypeAssertion-8   	15096373	        77.74 ns/op	       3 B/op	       0 allocs/op
+BenchmarkRistretto_GetWithTypeAssertion-8           	14743591	        80.04 ns/op	      27 B/op	       2 allocs/op
+BenchmarkGoCache_RealWorldScenario-8                	16369579	        70.87 ns/op	       4 B/op	       0 allocs/op
+BenchmarkTTLCache_RealWorldScenario-8               	 6387519	       189.5 ns/op	       4 B/op	       0 allocs/op
+BenchmarkExpirableCache_RealWorldScenario-8         	15014247	        82.28 ns/op	       3 B/op	       0 allocs/op
+BenchmarkRistretto_RealWorldScenario-8              	11046955	       105.6 ns/op	      29 B/op	       2 allocs/op
 ```
+
+## Methodology Note on Ristretto
+
+Ristretto applies writes asynchronously: `Set` only queues the write and returns, and the value may
+not be readable, or may be dropped altogether, until the queue is drained. Every benchmark here calls
+`cache.Wait()` after a timed `Set`, so the reported write cost includes applying the write and the
+numbers describe the same unit of work as the synchronous `Set` of the other libraries. Writes that
+`Set` refuses because the write buffer is full are counted and reported as a `drops/op` metric; there
+were none in the run above. A write that `Set` accepts can still be discarded later by the admission
+policy, so the metric is a lower bound.
 
 ## Summary of Results
 
 | Operation | [go-pkgz/expirable-cache](https://github.com/go-pkgz/expirable-cache) | [patrickmn/go-cache](https://github.com/patrickmn/go-cache) | [jellydator/ttlcache](https://github.com/jellydator/ttlcache) | [dgraph-io/ristretto](https://github.com/dgraph-io/ristretto) |
 |-----------|-----------------|----------|----------|-----------|
-| Set | 69.14 ns/op | 82.67 ns/op | 448.8 ns/op | 820.0 ns/op |
-| Get | 78.12 ns/op | 63.81 ns/op | 190.9 ns/op | 84.23 ns/op |
-| Set+Get | 66.62 ns/op | 67.94 ns/op | 253.9 ns/op | 198.2 ns/op |
-| Real-world scenario | 78.83 ns/op | 70.24 ns/op | 198.0 ns/op | 83.40 ns/op |
-| Memory allocations (Set) | 4 B/op | 68 B/op | 5 B/op | 262 B/op |
-| Memory allocations (Get) | 3 B/op | 3 B/op | 51 B/op | 27 B/op |
+| Set | 65.59 ns/op | 79.87 ns/op | 256.7 ns/op | 778.9 ns/op |
+| Get | 80.98 ns/op | 67.82 ns/op | 191.0 ns/op | 78.75 ns/op |
+| Set+Get | 65.93 ns/op | 69.63 ns/op | 198.9 ns/op | 528.7 ns/op |
+| Real-world scenario | 82.28 ns/op | 70.87 ns/op | 189.5 ns/op | 105.6 ns/op |
+| Memory allocations (Set) | 4 B/op | 67 B/op | 4 B/op | 262 B/op |
+| Memory allocations (Get) | 3 B/op | 3 B/op | 3 B/op | 27 B/op |
 
 ## Analysis
 
@@ -69,14 +79,14 @@ BenchmarkRistretto_RealWorldScenario-8              13030276        83.40 ns/op 
    - Higher memory usage for Set operations than expirable-cache
 
 3. **[dgraph-io/ristretto](https://github.com/dgraph-io/ristretto)**:
-   - Excellent for read-heavy workloads
+   - Excellent for read-heavy workloads, Get is on par with the fastest libraries here
    - Much higher memory usage than other libraries
-   - Considerably slower Set operations
+   - Considerably slower Set operations, and mixed read/write workloads suffer as well once queued writes are applied
    - Best suited for very large caches where sophisticated memory management is beneficial
 
 4. **[jellydator/ttlcache](https://github.com/jellydator/ttlcache)**:
-   - Significantly slower than other libraries for all operations
-   - Higher memory usage for Get operations
+   - Two to three times slower than go-cache and expirable-cache for all operations
+   - Memory usage is on par with the leaders since v3.4.1
    - Not recommended for performance-critical applications
 
 Thanks to [@analytically](https://github.com/analytically) for the benchmark code and initial analysis!

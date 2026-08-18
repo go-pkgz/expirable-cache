@@ -335,3 +335,42 @@ func ExampleCache() {
 	// value after expiration is found: false, value: "val1"
 	// Size: 1, Stats: {Hits:1 Misses:1 Added:2 Evicted:1} (50.0%)
 }
+
+func TestCacheValuesConcurrency(_ *testing.T) {
+	lc := NewCache[string, string]().WithTTL(time.Hour)
+	wg := sync.WaitGroup{}
+	wg.Add(3)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 1000; i++ {
+			lc.Set(fmt.Sprintf("key-%d", i), fmt.Sprintf("val-%d", i), 0)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 1000; i++ {
+			lc.Remove(fmt.Sprintf("key-%d", i))
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 1000; i++ {
+			lc.Values()
+		}
+	}()
+
+	wg.Wait()
+}
+
+func TestCacheAddEvictsOnSize(t *testing.T) {
+	lc := NewCache[string, string]().WithMaxKeys(2)
+
+	assert.False(t, lc.Add("key1", "val1"), "nothing to evict yet")
+	assert.False(t, lc.Add("key2", "val2"), "size not exceeded")
+	assert.True(t, lc.Add("key3", "val3"), "size exceeded, oldest entry evicted")
+	assert.False(t, lc.Add("key3", "val3-updated"), "existing key updated, nothing evicted")
+	assert.Equal(t, 2, lc.Len())
+}

@@ -38,6 +38,15 @@ func generateRandomItems(n int) []testItem {
 	return items
 }
 
+// reportDropped reports ristretto writes refused because its write buffer was full,
+// they are silently discarded. A write accepted by Set can still be discarded later by
+// the admission policy, so this is a lower bound on the writes that never landed
+func reportDropped(b *testing.B, dropped int) {
+	if dropped > 0 {
+		b.ReportMetric(float64(dropped)/float64(b.N), "drops/op")
+	}
+}
+
 // Benchmarks for go-cache
 func BenchmarkGoCache_Set(b *testing.B) {
 	cache := gocache.New(5*time.Minute, 10*time.Minute)
@@ -200,11 +209,15 @@ func BenchmarkRistretto_Set(b *testing.B) {
 	items := generateRandomItems(numItems)
 
 	b.ResetTimer()
+	dropped := 0
 	for i := 0; i < b.N; i++ {
 		item := items[i%numItems]
-		cache.Set(strconv.Itoa(item.ID), item, 1)
-		cache.Wait() // ensure item is set before next operation
+		if !cache.Set(strconv.Itoa(item.ID), item, 1) {
+			dropped++
+		}
+		cache.Wait() // ristretto writes are asynchronous, wait for the write to be applied
 	}
+	reportDropped(b, dropped)
 }
 
 func BenchmarkRistretto_Get(b *testing.B) {
@@ -251,15 +264,20 @@ func BenchmarkRistretto_SetAndGet(b *testing.B) {
 	cache.Wait() // ensure all items are set
 
 	b.ResetTimer()
+	dropped := 0
 	for i := 0; i < b.N; i++ {
 		if i%2 == 0 {
 			item := items[i%numItems]
-			cache.Set(strconv.Itoa(item.ID), item, 1)
+			if !cache.Set(strconv.Itoa(item.ID), item, 1) {
+				dropped++
+			}
+			cache.Wait() // ristretto writes are asynchronous, wait for the write to be applied
 		} else {
 			key := strconv.Itoa(rand.Intn(numItems))
 			_, _ = cache.Get(key)
 		}
 	}
+	reportDropped(b, dropped)
 }
 
 // Benchmark interface{} vs generic access patterns
@@ -440,6 +458,7 @@ func BenchmarkRistretto_RealWorldScenario(b *testing.B) {
 	cache.Wait() // ensure all items are set
 
 	b.ResetTimer()
+	dropped := 0
 	for i := 0; i < b.N; i++ {
 		key := strconv.Itoa(rand.Intn(numItems))
 		if val, found := cache.Get(key); found {
@@ -447,7 +466,11 @@ func BenchmarkRistretto_RealWorldScenario(b *testing.B) {
 		} else {
 			// Cache miss, add to cache
 			index := rand.Intn(numItems)
-			cache.Set(strconv.Itoa(index), items[index], 1)
+			if !cache.Set(strconv.Itoa(index), items[index], 1) {
+				dropped++
+			}
+			cache.Wait() // ristretto writes are asynchronous, wait for the write to be applied
 		}
 	}
+	reportDropped(b, dropped)
 }
