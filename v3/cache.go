@@ -199,10 +199,10 @@ func (c *cacheImpl[K, V]) Keys() []K {
 // Values returns a slice of the values in the cache, from oldest to newest.
 // Expired entries are filtered out.
 func (c *cacheImpl[K, V]) Values() []V {
-	values := make([]V, 0, len(c.items))
 	now := time.Now()
 	c.Lock()
 	defer c.Unlock()
+	values := make([]V, 0, len(c.items))
 	for ent := c.evictList.Back(); ent != nil; ent = ent.Prev() {
 		if !now.After(ent.Value.(*cacheItem[K, V]).expiresAt) {
 			values = append(values, ent.Value.(*cacheItem[K, V]).value)

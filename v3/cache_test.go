@@ -335,3 +335,32 @@ func ExampleCache() {
 	// value after expiration is found: false, value: "val1"
 	// Size: 1, Stats: {Hits:1 Misses:1 Added:2 Evicted:1} (50.0%)
 }
+
+func TestCacheValuesConcurrency(_ *testing.T) {
+	lc := NewCache[string, string]().WithTTL(time.Hour)
+	wg := sync.WaitGroup{}
+	wg.Add(3)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 1000; i++ {
+			lc.Set(fmt.Sprintf("key-%d", i), fmt.Sprintf("val-%d", i), 0)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 1000; i++ {
+			lc.Remove(fmt.Sprintf("key-%d", i))
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 1000; i++ {
+			lc.Values()
+		}
+	}()
+
+	wg.Wait()
+}
