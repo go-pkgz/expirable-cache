@@ -22,9 +22,9 @@ import (
 // Cache defines cache interface
 type Cache interface {
 	fmt.Stringer
-	Set(key string, value interface{}, ttl time.Duration)
-	Get(key string) (interface{}, bool)
-	Peek(key string) (interface{}, bool)
+	Set(key string, value any, ttl time.Duration)
+	Get(key string) (any, bool)
+	Peek(key string) (any, bool)
 	Keys() []string
 	Len() int
 	Invalidate(key string)
@@ -46,7 +46,7 @@ type cacheImpl struct {
 	ttl       time.Duration
 	maxKeys   int
 	isLRU     bool
-	onEvicted func(key string, value interface{})
+	onEvicted func(key string, value any)
 
 	sync.Mutex
 	stat      Stats
@@ -78,7 +78,7 @@ func NewCache(options ...Option) (Cache, error) {
 }
 
 // Set key, ttl of 0 would use cache-wide TTL
-func (c *cacheImpl) Set(key string, value interface{}, ttl time.Duration) {
+func (c *cacheImpl) Set(key string, value any, ttl time.Duration) {
 	if ttl == 0 {
 		ttl = c.ttl
 	}
@@ -115,7 +115,7 @@ func (c *cacheImpl) Set(key string, value interface{}, ttl time.Duration) {
 }
 
 // Get returns the key value if it's not expired
-func (c *cacheImpl) Get(key string) (interface{}, bool) {
+func (c *cacheImpl) Get(key string) (any, bool) {
 	c.Lock()
 	defer c.Unlock()
 	if ent, ok := c.items[key]; ok {
@@ -136,7 +136,7 @@ func (c *cacheImpl) Get(key string) (interface{}, bool) {
 
 // Peek returns the key value (or undefined if not found) without updating the "recently used"-ness of the key.
 // Works exactly the same as Get in case of LRC mode (default one).
-func (c *cacheImpl) Peek(key string) (interface{}, bool) {
+func (c *cacheImpl) Peek(key string) (any, bool) {
 	c.Lock()
 	defer c.Unlock()
 	if ent, ok := c.items[key]; ok {
@@ -251,7 +251,6 @@ func (c *cacheImpl) removeOldest() {
 	}
 }
 
-
 // removeElement is used to remove a given list element from the cache. Has to be called with lock!
 func (c *cacheImpl) removeElement(e *list.Element) {
 	c.evictList.Remove(e)
@@ -267,5 +266,5 @@ func (c *cacheImpl) removeElement(e *list.Element) {
 type cacheItem struct {
 	expiresAt time.Time
 	key       string
-	value     interface{}
+	value     any
 }
