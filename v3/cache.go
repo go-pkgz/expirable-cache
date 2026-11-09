@@ -235,10 +235,7 @@ func (c *cacheImpl[K, V]) Resize(size int) int {
 		c.maxKeys = 0
 		return 0
 	}
-	diff := c.evictList.Len() - size
-	if diff < 0 {
-		diff = 0
-	}
+	diff := max(c.evictList.Len()-size, 0)
 	for i := 0; i < diff; i++ {
 		c.removeOldest()
 	}

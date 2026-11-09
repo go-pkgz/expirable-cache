@@ -149,7 +149,7 @@ func TestCacheWithDeleteExpired(t *testing.T) {
 	var evicted []string
 	lc, err := NewCache(
 		TTL(150*time.Millisecond),
-		OnEvicted(func(key string, value interface{}) { evicted = append(evicted, key, value.(string)) }),
+		OnEvicted(func(key string, value any) { evicted = append(evicted, key, value.(string)) }),
 	)
 	assert.NoError(t, err)
 
@@ -220,7 +220,7 @@ func TestCacheConcurrency(t *testing.T) {
 
 func TestCacheInvalidateAndEvict(t *testing.T) {
 	var evicted int
-	lc, err := NewCache(LRU(), OnEvicted(func(_ string, _ interface{}) { evicted++ }))
+	lc, err := NewCache(LRU(), OnEvicted(func(_ string, _ any) { evicted++ }))
 	assert.NoError(t, err)
 
 	lc.Set("key1", "val1", 0)

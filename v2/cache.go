@@ -247,7 +247,6 @@ func (c *cacheImpl[K, V]) removeOldest() {
 	}
 }
 
-
 // removeElement is used to remove a given list element from the cache. Has to be called with lock!
 func (c *cacheImpl[K, V]) removeElement(e *list.Element) {
 	c.evictList.Remove(e)

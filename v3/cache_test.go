@@ -196,7 +196,7 @@ func TestCache_Values(t *testing.T) {
 func TestCacheWithPurgeEnforcedBySize(t *testing.T) {
 	lc := NewCache[string, string]().WithTTL(time.Hour).WithMaxKeys(10)
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		i := i
 		lc.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i), 0)
 		v, ok := lc.Get(fmt.Sprintf("key%d", i))
@@ -212,7 +212,7 @@ func TestCacheConcurrency(t *testing.T) {
 	lc := NewCache[string, string]()
 	wg := sync.WaitGroup{}
 	wg.Add(1000)
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		go func(i int) {
 			lc.Set(fmt.Sprintf("key-%d", i/10), fmt.Sprintf("val-%d", i/10), 0)
 			wg.Done()
@@ -343,21 +343,21 @@ func TestCacheValuesConcurrency(_ *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			lc.Set(fmt.Sprintf("key-%d", i), fmt.Sprintf("val-%d", i), 0)
 		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			lc.Remove(fmt.Sprintf("key-%d", i))
 		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 1000; i++ {
+		for range 1000 {
 			lc.Values()
 		}
 	}()

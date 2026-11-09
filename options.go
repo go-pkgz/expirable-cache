@@ -6,7 +6,7 @@ import "time"
 type Option func(lc *cacheImpl) error
 
 // OnEvicted called automatically for automatically and manually deleted entries
-func OnEvicted(fn func(key string, value interface{})) Option {
+func OnEvicted(fn func(key string, value any)) Option {
 	return func(lc *cacheImpl) error {
 		lc.onEvicted = fn
 		return nil

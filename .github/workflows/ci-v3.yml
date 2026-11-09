@@ -2,8 +2,8 @@ name: build-v3
 
 on:
   push:
-    branches:
-    tags:
+    branches: ["**"]
+    tags: ["**"]
     paths:
       - ".github/workflows/ci-v3.yml"
       - "v3/**"
@@ -11,6 +11,9 @@ on:
     paths:
       - ".github/workflows/ci-v3.yml"
       - "v3/**"
+
+permissions:
+  contents: read  # to fetch code (actions/checkout)
 
 jobs:
   build:
@@ -22,7 +25,7 @@ jobs:
 
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: read go version from v3/go.mod
         id: gomod
@@ -32,7 +35,7 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: set up go ${{ matrix.go }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go == 'stable' && 'stable' || steps.gomod.outputs.version }}
           check-latest: true
@@ -41,24 +44,24 @@ jobs:
 
       - name: build and test
         run: |
-          go test -timeout=60s -race -covermode=atomic -coverprofile=$GITHUB_WORKSPACE/profile.cov
+          go test -timeout=60s -race -covermode=atomic -coverprofile="$GITHUB_WORKSPACE/profile.cov"
           go build -race
         working-directory: v3
 
       - name: golangci-lint
-        # golangci-lint v2.6 cannot read export data from newer Go releases
+        # lint once per run, on the go.mod Go version
         if: matrix.go == 'go.mod'
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.6
+          version: v2.15
           args: --config ../.golangci.yml
           working-directory: v3
 
       - name: install goveralls, submit coverage
         if: matrix.go == 'stable'
         run: |
-          go install github.com/mattn/goveralls@latest
-          goveralls -service="github" -coverprofile=$GITHUB_WORKSPACE/profile.cov
+          go install github.com/mattn/goveralls@v0.0.12
+          goveralls -service="github" -coverprofile="$GITHUB_WORKSPACE/profile.cov"
         env:
           COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         working-directory: v3
