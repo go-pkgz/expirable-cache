@@ -132,6 +132,12 @@ func TestSimpleLRUInterface(_ *testing.T) {
 	var _ simplelru.LRUCache[int, int] = NewCache[int, int]()
 }
 
+// regression: String divided by zero hits+misses and printed NaN% before any lookup
+func TestCacheStringNoLookups(t *testing.T) {
+	lc := NewCache[string, string]()
+	assert.Equal(t, "Size: 0, Stats: {Hits:0 Misses:0 Added:0 Evicted:0} (0.0%)", lc.String())
+}
+
 func TestCacheNoPurge(t *testing.T) {
 	lc := NewCache[string, string]()
 
