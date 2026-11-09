@@ -8,6 +8,7 @@ Package cache implements expirable cache.
 
 - Support LRC, LRU and TTL-based eviction.
 - Package is thread-safe and doesn't spawn any goroutines.
+- v3 `ContainsOrAdd` checks for a key and adds it if missing under one lock, so concurrent callers need no lock of their own around `Contains` and `Add`.
 - On every Set() call, cache deletes single oldest entry in case it's expired.
 - In case MaxSize is set, cache deletes the oldest entry disregarding its expiration date to maintain the size,
 either using LRC or LRU eviction.

@@ -32,6 +32,7 @@ type Cache[K comparable, V any] interface {
 	GetExpiration(key K) (time.Time, bool)
 	GetOldest() (K, V, bool)
 	Contains(key K) (ok bool)
+	ContainsOrAdd(key K, value V) (ok, evicted bool)
 	Peek(key K) (V, bool)
 	Values() []V
 	Keys() []K
@@ -105,6 +106,11 @@ func (c *cacheImpl[K, V]) addWithTTL(key K, value V, ttl time.Duration) (evicted
 	now := time.Now()
 	c.Lock()
 	defer c.Unlock()
+	return c.add(key, value, ttl, now)
+}
+
+// add implements addWithTTL. Has to be called with lock!
+func (c *cacheImpl[K, V]) add(key K, value V, ttl time.Duration, now time.Time) (evicted bool) {
 	// Check for existing item
 	if ent, ok := c.items[key]; ok {
 		c.evictList.MoveToFront(ent)
@@ -167,6 +173,20 @@ func (c *cacheImpl[K, V]) Contains(key K) (ok bool) {
 		return false
 	}
 	return !time.Now().After(ent.Value.(*cacheItem[K, V]).expiresAt)
+}
+
+// ContainsOrAdd checks if a key is in the cache and adds the value if it is not, under one lock.
+// A found key changes nothing: no recent-ness update and no stats. An expired entry counts as
+// missing and is replaced the same way Add updates an existing key.
+// Returns whether the key was found, and whether adding it caused an eviction.
+func (c *cacheImpl[K, V]) ContainsOrAdd(key K, value V) (ok, evicted bool) {
+	c.Lock()
+	defer c.Unlock()
+	now := time.Now()
+	if ent, found := c.items[key]; found && !now.After(ent.Value.(*cacheItem[K, V]).expiresAt) {
+		return true, false
+	}
+	return false, c.add(key, value, c.ttl, now)
 }
 
 // Peek returns the key value (or undefined if not found) without updating the "recently used"-ness of the key.
