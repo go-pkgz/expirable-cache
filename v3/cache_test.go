@@ -201,22 +201,28 @@ func TestCacheContainsOrAdd(t *testing.T) {
 }
 
 func TestCacheContainsOrAddConcurrency(t *testing.T) {
-	lc := NewCache[string, int]()
+	const keys, workers = 1000, 8
+	lc := NewCache[int, int]()
 	var added atomic.Int32
+	start := make(chan struct{})
 	wg := sync.WaitGroup{}
-	wg.Add(100)
-	for i := range 100 {
+	wg.Add(workers)
+	for w := range workers {
 		go func() {
 			defer wg.Done()
-			if ok, _ := lc.ContainsOrAdd("key", i); !ok {
-				added.Add(1)
+			<-start
+			for k := range keys {
+				if ok, _ := lc.ContainsOrAdd(k, w); !ok {
+					added.Add(1)
+				}
 			}
 		}()
 	}
+	close(start)
 	wg.Wait()
-	assert.Equal(t, int32(1), added.Load())
-	assert.Equal(t, 1, lc.Stat().Added)
-	assert.Equal(t, 1, lc.Len())
+	assert.Equal(t, int32(keys), added.Load())
+	assert.Equal(t, keys, lc.Stat().Added)
+	assert.Equal(t, keys, lc.Len())
 }
 
 func TestCache_Values(t *testing.T) {

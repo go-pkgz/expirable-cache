@@ -180,9 +180,9 @@ func (c *cacheImpl[K, V]) Contains(key K) (ok bool) {
 // missing and is replaced the same way Add updates an existing key.
 // Returns whether the key was found, and whether adding it caused an eviction.
 func (c *cacheImpl[K, V]) ContainsOrAdd(key K, value V) (ok, evicted bool) {
-	now := time.Now()
 	c.Lock()
 	defer c.Unlock()
+	now := time.Now()
 	if ent, found := c.items[key]; found && !now.After(ent.Value.(*cacheItem[K, V]).expiresAt) {
 		return true, false
 	}
