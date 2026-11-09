@@ -133,3 +133,20 @@ func TestCacheContainsExpired(t *testing.T) {
 	assert.False(t, lc.Contains("key1"))
 	assert.Empty(t, lc.Keys())
 }
+
+func TestCacheContainsOrAddExpired(t *testing.T) {
+	lc := NewCache[string, string]().WithTTL(50 * time.Millisecond)
+	lc.Add("key1", "val1")
+
+	time.Sleep(150 * time.Millisecond) // expire key1
+
+	ok, evicted := lc.ContainsOrAdd("key1", "val2")
+	assert.False(t, ok, "expired entry counts as missing")
+	assert.False(t, evicted)
+	assert.Equal(t, Stats{Added: 1}, lc.Stat(), "replaced in place, the same way Add updates a key")
+
+	v, found := lc.Get("key1")
+	assert.True(t, found)
+	assert.Equal(t, "val2", v)
+	assert.Equal(t, 1, lc.Len())
+}

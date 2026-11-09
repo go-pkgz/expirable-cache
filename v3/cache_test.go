@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -173,6 +174,49 @@ func TestCacheNoPurge(t *testing.T) {
 	assert.False(t, ok)
 
 	assert.Equal(t, []string{"key3", "key4", "key1"}, lc.Keys())
+}
+
+func TestCacheContainsOrAdd(t *testing.T) {
+	lc := NewCache[string, string]().WithLRU().WithMaxKeys(2)
+
+	ok, evicted := lc.ContainsOrAdd("key1", "val1")
+	assert.False(t, ok)
+	assert.False(t, evicted)
+	lc.Add("key2", "val2")
+
+	ok, evicted = lc.ContainsOrAdd("key1", "other")
+	assert.True(t, ok)
+	assert.False(t, evicted)
+	assert.Equal(t, Stats{Added: 2}, lc.Stat())
+	assert.Equal(t, []string{"key1", "key2"}, lc.Keys())
+
+	ok, evicted = lc.ContainsOrAdd("key3", "val3")
+	assert.False(t, ok)
+	assert.True(t, evicted)
+	assert.Equal(t, []string{"key2", "key3"}, lc.Keys())
+
+	v, found := lc.Peek("key2")
+	assert.True(t, found)
+	assert.Equal(t, "val2", v)
+}
+
+func TestCacheContainsOrAddConcurrency(t *testing.T) {
+	lc := NewCache[string, int]()
+	var added atomic.Int32
+	wg := sync.WaitGroup{}
+	wg.Add(100)
+	for i := range 100 {
+		go func() {
+			defer wg.Done()
+			if ok, _ := lc.ContainsOrAdd("key", i); !ok {
+				added.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	assert.Equal(t, int32(1), added.Load())
+	assert.Equal(t, 1, lc.Stat().Added)
+	assert.Equal(t, 1, lc.Len())
 }
 
 func TestCache_Values(t *testing.T) {
