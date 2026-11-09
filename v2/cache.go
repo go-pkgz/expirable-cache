@@ -227,7 +227,11 @@ func (c *cacheImpl[K, V]) Stat() Stats {
 func (c *cacheImpl[K, V]) String() string {
 	stats := c.Stat()
 	size := c.Len()
-	return fmt.Sprintf("Size: %d, Stats: %+v (%0.1f%%)", size, stats, 100*float64(stats.Hits)/float64(stats.Hits+stats.Misses))
+	ratio := 0.0
+	if total := stats.Hits + stats.Misses; total > 0 {
+		ratio = 100 * float64(stats.Hits) / float64(total)
+	}
+	return fmt.Sprintf("Size: %d, Stats: %+v (%0.1f%%)", size, stats, ratio)
 }
 
 // Keys returns a slice of the keys in the cache, from oldest to newest. Has to be called with lock!

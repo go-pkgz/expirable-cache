@@ -127,6 +127,13 @@ func BenchmarkLRU_Freq_WithExpire(b *testing.B) {
 	b.Logf("hit: %d miss: %d ratio: %f", hit, miss, float64(hit)/float64(hit+miss))
 }
 
+// regression: String divided by zero hits+misses and printed NaN% before any lookup
+func TestCacheStringNoLookups(t *testing.T) {
+	lc, err := NewCache()
+	assert.NoError(t, err)
+	assert.Equal(t, "Size: 0, Stats: {Hits:0 Misses:0 Added:0 Evicted:0} (0.0%)", lc.String())
+}
+
 func TestCacheNoPurge(t *testing.T) {
 	lc, err := NewCache()
 	assert.NoError(t, err)
