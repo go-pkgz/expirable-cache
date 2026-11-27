@@ -68,25 +68,25 @@ policy, so the metric is a lower bound.
    - Best overall balance of performance and features
    - Fastest Set operations among all libraries
    - Very competitive Get operations
-   - Lowest memory usage across all benchmarks
+   - Lowest or tied for lowest allocations per operation across all benchmarks
    - Type safety through generics
    - Clean API with method chaining
 
 2. **[patrickmn/go-cache](https://github.com/patrickmn/go-cache)**:
    - Fastest Get operations
    - Very competitive overall performance
-   - However, it's known to leak goroutines and lacks modern features
-   - Higher memory usage for Set operations than expirable-cache
+   - However, it lacks modern features
+   - More bytes allocated per Set operation than expirable-cache
 
 3. **[dgraph-io/ristretto](https://github.com/dgraph-io/ristretto)**:
    - Excellent for read-heavy workloads, Get is on par with the fastest libraries here
-   - Much higher memory usage than other libraries
+   - Much higher allocations per operation than other libraries
    - Considerably slower Set operations, and mixed read/write workloads suffer as well once queued writes are applied
    - Best suited for very large caches where sophisticated memory management is beneficial
 
 4. **[jellydator/ttlcache](https://github.com/jellydator/ttlcache)**:
-   - Two to three times slower than go-cache and expirable-cache for all operations
-   - Memory usage is on par with the leaders since v3.4.1
+   - Two to four times slower than go-cache and expirable-cache for all operations
+   - Allocations per operation are on par with the leaders since v3.4.1
    - Not recommended for performance-critical applications
 
 Thanks to [@analytically](https://github.com/analytically) for the benchmark code and initial analysis!
