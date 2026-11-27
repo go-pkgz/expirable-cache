@@ -73,12 +73,12 @@ func NewCache[K comparable, V any]() Cache[K, V] {
 
 // Set key, ttl of 0 would use cache-wide TTL
 func (c *cacheImpl[K, V]) Set(key K, value V, ttl time.Duration) {
-	if ttl == 0 {
-		ttl = c.ttl
-	}
 	now := time.Now()
 	c.Lock()
 	defer c.Unlock()
+	if ttl == 0 {
+		ttl = c.ttl
+	}
 
 	// Check for existing item
 	if ent, ok := c.items[key]; ok {

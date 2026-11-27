@@ -87,7 +87,7 @@ func NewCache[K comparable, V any]() Cache[K, V] {
 // Returns false if there was no eviction: the item was already in the cache,
 // or nothing had to be removed.
 func (c *cacheImpl[K, V]) Add(key K, value V) (evicted bool) {
-	return c.addWithTTL(key, value, c.ttl)
+	return c.addWithTTL(key, value, 0)
 }
 
 // Set key, ttl of 0 would use cache-wide TTL
@@ -100,12 +100,12 @@ func (c *cacheImpl[K, V]) Set(key K, value V, ttl time.Duration) {
 // Returns false if there was no eviction: the item was already in the cache,
 // or nothing had to be removed.
 func (c *cacheImpl[K, V]) addWithTTL(key K, value V, ttl time.Duration) (evicted bool) {
-	if ttl == 0 {
-		ttl = c.ttl
-	}
 	now := time.Now()
 	c.Lock()
 	defer c.Unlock()
+	if ttl == 0 {
+		ttl = c.ttl
+	}
 	return c.add(key, value, ttl, now)
 }
 
