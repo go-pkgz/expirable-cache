@@ -19,7 +19,7 @@ func (c *cacheImpl[K, V]) WithTTL(ttl time.Duration) Cache[K, V] {
 }
 
 // WithMaxKeys functional option defines how many keys to keep.
-// By default, it is 0, which means unlimited.
+// By default, it is 0, which means unlimited. Lowering it does not remove entries already over the limit.
 func (c *cacheImpl[K, V]) WithMaxKeys(maxKeys int) Cache[K, V] {
 	c.Lock()
 	defer c.Unlock()

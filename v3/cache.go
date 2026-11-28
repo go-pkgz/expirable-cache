@@ -31,10 +31,11 @@ type Cache[K comparable, V any] interface {
 
 	// WithTTL sets the cache-wide TTL, used by Add, ContainsOrAdd and Set with a ttl of 0, for entries
 	// added or updated afterwards. By default, it is set to 10 years, which is the way to disable expiry;
-	// sane option for expirable cache might be 5 minutes. A TTL of 0 or less makes those entries expire at once.
+	// sane option for expirable cache might be 5 minutes. A TTL of 0 makes those entries expire as soon as the clock
+	// moves past the time they were added, and a negative TTL makes them expire at once.
 	WithTTL(ttl time.Duration) Cache[K, V]
 	// WithMaxKeys functional option defines how many keys to keep.
-	// By default, it is 0, which means unlimited.
+	// By default, it is 0, which means unlimited. Lowering it does not remove entries already over the limit; Resize does.
 	WithMaxKeys(maxKeys int) Cache[K, V]
 	// WithLRU sets cache to LRU (Least Recently Used) eviction mode, in which Get also moves an entry to the front.
 	// By default, the mode is LRC (Least Recently Created), in which only adding or updating a key does.

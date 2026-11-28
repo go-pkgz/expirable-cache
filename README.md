@@ -23,8 +23,9 @@ advisable period is 1/2 of TTL.
 
 This cache is heavily inspired by [hashicorp/golang-lru](https://github.com/hashicorp/golang-lru) _simplelru_ implementation. v3 implements `simplelru.LRUCache` interface, so if you use only the functions of that interface, you can switch from `github.com/hashicorp/golang-lru/v2/simplelru` or `github.com/hashicorp/golang-lru/v2/expirable` without any changes in your code except for cache creation, which must include `WithLRU()` to keep the LRU eviction order. The behavior still differs in these points:
 
-- A TTL of 0 or less makes entries expire at once, while `expirable.NewLRU` treats 0 as no expiry; here the default TTL (10 years) is the way to disable expiry
+- A TTL of 0 makes entries expire as soon as the clock moves past the time they were added, and a negative TTL makes them expire at once, while `expirable.NewLRU` treats 0 or less as no expiry; here the default TTL (10 years) is the way to disable expiry
 - On an expired key, `Get` returns the stored value with `false` and `Contains` returns `false`, while `expirable` returns the zero value from `Get` and `true` from `Contains` until it removes the entry
+- `Values` skips expired entries, so it can be shorter than `Keys` and `Len`, while `expirable` returns `Len` items with zero values at the end in place of the expired ones; code migrated from `expirable` that indexes `Values` up to `Len` can panic here
 - Expired entries are not removed in the background, see the note on `DeleteExpired` above
 - `Add` also returns `true` when it removed an expired entry, not only when the size limit forced an eviction
 - `Resize(0)` removes the size limit, as in `expirable`, while in `simplelru` it removes every entry
@@ -42,8 +43,8 @@ untouched, which is what LRU mode adds
 
 v3 is configured by chaining these methods on `NewCache[K, V]()`:
 
-- `WithTTL(ttl)` sets the cache-wide TTL, used by `Add`, `ContainsOrAdd` and `Set` with a ttl of 0. The default is 10 years, which is the way to disable expiry; a TTL of 0 or less makes those entries expire at once
-- `WithMaxKeys(n)` sets how many keys to keep. The default is 0, unlimited
+- `WithTTL(ttl)` sets the cache-wide TTL, used by `Add`, `ContainsOrAdd` and `Set` with a ttl of 0. The default is 10 years, which is the way to disable expiry; a TTL of 0 makes those entries expire as soon as the clock moves past the time they were added, and a negative TTL makes them expire at once
+- `WithMaxKeys(n)` sets how many keys to keep. The default is 0, unlimited. Lowering it does not remove entries already over the limit; `Resize` does
 - `WithLRU()` switches to LRU eviction, in which `Get` moves an entry to the front. The default is LRC, in which only adding or updating a key does
 - `WithOnEvicted(fn)` sets a function called for every removed entry, whether removed automatically or manually. There is none by default
 
