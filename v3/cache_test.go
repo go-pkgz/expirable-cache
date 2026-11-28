@@ -253,7 +253,6 @@ func TestCacheWithPurgeEnforcedBySize(t *testing.T) {
 	lc := NewCache[string, string]().WithTTL(time.Hour).WithMaxKeys(10)
 
 	for i := range 100 {
-		i := i
 		lc.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i), 0)
 		v, ok := lc.Get(fmt.Sprintf("key%d", i))
 		assert.Equal(t, fmt.Sprintf("val%d", i), v)
