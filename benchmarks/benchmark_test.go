@@ -26,7 +26,7 @@ type testItem struct {
 
 func generateRandomItems(n int) []testItem {
 	items := make([]testItem, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		items[i] = testItem{
 			ID:    i,
 			Name:  fmt.Sprintf("item-%d", i),
@@ -373,7 +373,7 @@ func BenchmarkGoCache_RealWorldScenario(b *testing.B) {
 	items := generateRandomItems(numItems)
 
 	// Populate cache with 80% of items
-	for i := 0; i < int(float64(numItems)*0.8); i++ {
+	for i := range int(float64(numItems) * 0.8) {
 		cache.Set(strconv.Itoa(items[i].ID), items[i], gocache.DefaultExpiration)
 	}
 
@@ -400,7 +400,7 @@ func BenchmarkTTLCache_RealWorldScenario(b *testing.B) {
 	items := generateRandomItems(numItems)
 
 	// Populate cache with 80% of items
-	for i := 0; i < int(float64(numItems)*0.8); i++ {
+	for i := range int(float64(numItems) * 0.8) {
 		cache.Set(strconv.Itoa(items[i].ID), items[i], ttlcache.DefaultTTL)
 	}
 
@@ -422,7 +422,7 @@ func BenchmarkExpirableCache_RealWorldScenario(b *testing.B) {
 	items := generateRandomItems(numItems)
 
 	// Populate cache with 80% of items
-	for i := 0; i < int(float64(numItems)*0.8); i++ {
+	for i := range int(float64(numItems) * 0.8) {
 		cache.Set(strconv.Itoa(items[i].ID), items[i], 0)
 	}
 
@@ -452,7 +452,7 @@ func BenchmarkRistretto_RealWorldScenario(b *testing.B) {
 	items := generateRandomItems(numItems)
 
 	// Populate cache with 80% of items
-	for i := 0; i < int(float64(numItems)*0.8); i++ {
+	for i := range int(float64(numItems) * 0.8) {
 		cache.Set(strconv.Itoa(items[i].ID), items[i], 1)
 	}
 	cache.Wait() // ensure all items are set

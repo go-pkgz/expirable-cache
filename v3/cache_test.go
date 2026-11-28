@@ -253,7 +253,6 @@ func TestCacheWithPurgeEnforcedBySize(t *testing.T) {
 	lc := NewCache[string, string]().WithTTL(time.Hour).WithMaxKeys(10)
 
 	for i := range 100 {
-		i := i
 		lc.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i), 0)
 		v, ok := lc.Get(fmt.Sprintf("key%d", i))
 		assert.Equal(t, fmt.Sprintf("val%d", i), v)
@@ -276,6 +275,99 @@ func TestCacheConcurrency(t *testing.T) {
 	}
 	wg.Wait()
 	assert.Equal(t, 100, lc.Len())
+}
+
+// regression: With* wrote settings without the cache lock, racing with the calls that read them
+func TestCacheWithMethodsConcurrency(t *testing.T) {
+	tbl := []struct {
+		name  string
+		set   func(c Cache[int, int])
+		use   func(c Cache[int, int], i int)
+		check func(t *testing.T, c Cache[int, int])
+	}{
+		{
+			name: "WithTTL and Set with zero ttl",
+			set:  func(c Cache[int, int]) { c.WithTTL(time.Minute) },
+			use:  func(c Cache[int, int], i int) { c.Set(i, i, 0) },
+			check: func(t *testing.T, c Cache[int, int]) {
+				c.Set(-1, -1, 0)
+				exp, ok := c.GetExpiration(-1)
+				assert.True(t, ok)
+				assert.WithinDuration(t, time.Now().Add(time.Minute), exp, 10*time.Second)
+			},
+		},
+		{
+			name: "WithTTL and Add",
+			set:  func(c Cache[int, int]) { c.WithTTL(time.Minute) },
+			use:  func(c Cache[int, int], i int) { c.Add(i, i) },
+			check: func(t *testing.T, c Cache[int, int]) {
+				c.Add(-1, -1)
+				exp, ok := c.GetExpiration(-1)
+				assert.True(t, ok)
+				assert.WithinDuration(t, time.Now().Add(time.Minute), exp, 10*time.Second)
+			},
+		},
+		{
+			name: "WithMaxKeys and Set",
+			set:  func(c Cache[int, int]) { c.WithMaxKeys(50) },
+			use:  func(c Cache[int, int], i int) { c.Set(i, i, 0) },
+			check: func(t *testing.T, c Cache[int, int]) {
+				size := c.Len()
+				assert.GreaterOrEqual(t, size, 50)
+				for i := range 10 {
+					assert.True(t, c.Add(-1-i, i))
+				}
+				assert.Equal(t, size, c.Len())
+			},
+		},
+		{
+			name: "WithLRU and Get",
+			set:  func(c Cache[int, int]) { c.WithLRU() },
+			use:  func(c Cache[int, int], _ int) { c.Get(0) },
+			check: func(t *testing.T, c Cache[int, int]) {
+				c.Set(1, 1, 0)
+				c.Get(0)
+				assert.Equal(t, []int{1, 0}, c.Keys())
+			},
+		},
+		{
+			name: "WithOnEvicted and Remove",
+			set:  func(c Cache[int, int]) { c.WithOnEvicted(func(int, int) {}) },
+			use: func(c Cache[int, int], i int) {
+				c.Set(i, i, 0)
+				c.Remove(i)
+			},
+			check: func(t *testing.T, c Cache[int, int]) {
+				var evicted []int
+				c.WithOnEvicted(func(k, _ int) { evicted = append(evicted, k) })
+				c.Remove(0)
+				assert.Equal(t, []int{0}, evicted)
+			},
+		},
+	}
+
+	for _, tt := range tbl {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewCache[int, int]()
+			c.Set(0, 0, 0)
+			start := make(chan struct{})
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				for range 1000 {
+					tt.set(c)
+				}
+			}()
+			close(start)
+			for i := 1; i <= 1000; i++ {
+				tt.use(c, i)
+			}
+			wg.Wait()
+			tt.check(t, c)
+		})
+	}
 }
 
 func TestCacheInvalidateAndEvict(t *testing.T) {

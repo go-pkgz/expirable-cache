@@ -2,11 +2,14 @@
 //
 // Support LRC, LRU and TTL-based eviction.
 // Package is thread-safe and doesn't spawn any goroutines.
-// On every Set() call, cache deletes single oldest entry in case it's expired.
-// In case MaxSize is set, cache deletes the oldest entry disregarding its expiration date to maintain the size,
+// Callbacks set with OnEvicted and the predicate of InvalidateFn run with the cache lock held
+// and must not call the cache, or they deadlock.
+// When Set adds a new key, the cache removes the oldest entry if it has expired,
+// unless both the cache and the new entry use the default TTL; updating an existing key removes nothing.
+// In case MaxKeys is set, cache deletes the oldest entry disregarding its expiration date to maintain the size,
 // either using LRC or LRU eviction.
-// In case of default TTL (10 years) and default MaxSize (0, unlimited) the cache will be truly unlimited
-// and will never delete entries from itself automatically.
+// In case of default TTL (10 years) and default MaxKeys (0, unlimited) the cache will be truly unlimited
+// and will never delete entries from itself automatically, unless entries are given their own TTL.
 //
 // Important: only reliable way of not having expired entries stuck in a cache is to
 // run cache.DeleteExpired periodically using time.Ticker, advisable period is 1/2 of TTL.
@@ -35,7 +38,10 @@ type Cache interface {
 	Stat() Stats
 }
 
-// Stats provides statistics for cache
+// Stats provides statistics for cache.
+// Hits and Misses count lookups by Get and Peek; an expired entry counts as a miss.
+// Added counts new keys, not updates of existing ones.
+// Evicted counts every entry removed for any reason, including explicit removal and Purge.
 type Stats struct {
 	Hits, Misses   int // cache effectiveness
 	Added, Evicted int // number of added and evicted records
