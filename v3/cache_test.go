@@ -278,8 +278,7 @@ func TestCacheConcurrency(t *testing.T) {
 	assert.Equal(t, 100, lc.Len())
 }
 
-// TestCacheWithMethodsConcurrency runs each With* method against a cache call that reads the
-// same setting; under -race it fails unless both sides take the cache lock.
+// regression: With* wrote settings without the cache lock, racing with the calls that read them
 func TestCacheWithMethodsConcurrency(t *testing.T) {
 	tbl := []struct {
 		name  string
@@ -314,7 +313,6 @@ func TestCacheWithMethodsConcurrency(t *testing.T) {
 			set:  func(c Cache[int, int]) { c.WithMaxKeys(50) },
 			use:  func(c Cache[int, int], i int) { c.Set(i, i, 0) },
 			check: func(t *testing.T, c Cache[int, int]) {
-				// each new key now removes the oldest one, so the size stays where it is
 				size := c.Len()
 				assert.GreaterOrEqual(t, size, 50)
 				for i := range 10 {
